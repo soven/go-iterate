@@ -1,0 +1,166 @@
+package {{ .PackageName }}
+
+import "github.com/pkg/errors"
+
+type {{ .TitlePrefix }}Handler interface {
+	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+	Handle({{ .TypeName }}) error
+}
+
+type {{ .TitlePrefix }}Handle func({{ .TypeName }}) error
+
+func (h {{ .TitlePrefix }}Handle) Handle(item {{ .TypeName }}) error { return h(item) }
+
+var {{ .TitlePrefix }}DoNothing = {{ .TitlePrefix }}Handle(func(_ {{ .TypeName }}) error { return nil })
+
+type double{{ .TitlePrefix }}Handler struct {
+	lhs, rhs {{ .TitlePrefix }}Handler
+}
+
+func (h double{{ .TitlePrefix }}Handler) Handle(item {{ .TypeName }}) error {
+	err := h.lhs.Handle(item)
+	if err != nil {
+		return errors.Wrap(err, "handle lhs")
+	}
+	err = h.rhs.Handle(item)
+	if err != nil {
+		return errors.Wrap(err, "handle rhs")
+	}
+	return nil
+}
+
+func {{ .TitlePrefix }}HandlerSeries(handlers ...{{ .TitlePrefix }}Handler) {{ .TitlePrefix }}Handler {
+	var series {{ .TitlePrefix }}Handler = {{ .TitlePrefix }}DoNothing
+	for i := len(handlers) - 1; i >= 0; i-- {
+		if handlers[i] == nil {
+			continue
+		}
+		series = double{{ .TitlePrefix }}Handler{lhs: handlers[i], rhs: series}
+	}
+	return series
+}
+
+type Handling{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	handler {{ .TitlePrefix }}Handler
+}
+
+func (it *Handling{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	if it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		err := it.handler.Handle(next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "handling iterator: check")
+			}
+			it.err = err
+			return false
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}Handling sets handler while iterating over items.
+// If handlers is empty, so it will do nothing.
+func {{ .TitlePrefix }}Handling(items {{ .TitlePrefix }}Iterator, handlers ...{{ .TitlePrefix }}Handler) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &Handling{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, {{ .TitlePrefix }}HandlerSeries(handlers...)}
+}
+
+func {{ .TitlePrefix }}Range(items {{ .TitlePrefix }}Iterator, handler ...{{ .TitlePrefix }}Handler) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}Handling(items, handler...))
+}
+
+type {{ .TitlePrefix }}EnumHandler interface {
+	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+	Handle(int, {{ .TypeName }}) error
+}
+
+type {{ .TitlePrefix }}EnumHandle func(int, {{ .TypeName }}) error
+
+func (h {{ .TitlePrefix }}EnumHandle) Handle(n int, item {{ .TypeName }}) error { return h(n, item) }
+
+var {{ .TitlePrefix }}DoEnumNothing = {{ .TitlePrefix }}EnumHandle(func(_ int, _ {{ .TypeName }}) error { return nil })
+
+type double{{ .TitlePrefix }}EnumHandler struct {
+	lhs, rhs {{ .TitlePrefix }}EnumHandler
+}
+
+func (h double{{ .TitlePrefix }}EnumHandler) Handle(n int, item {{ .TypeName }}) error {
+	err := h.lhs.Handle(n, item)
+	if err != nil {
+		return errors.Wrap(err, "handle lhs")
+	}
+	err = h.rhs.Handle(n, item)
+	if err != nil {
+		return errors.Wrap(err, "handle rhs")
+	}
+	return nil
+}
+
+func {{ .TitlePrefix }}EnumHandlerSeries(handlers ...{{ .TitlePrefix }}EnumHandler) {{ .TitlePrefix }}EnumHandler {
+	var series {{ .TitlePrefix }}EnumHandler = {{ .TitlePrefix }}DoEnumNothing
+	for i := len(handlers) - 1; i >= 0; i-- {
+		if handlers[i] == nil {
+			continue
+		}
+		series = double{{ .TitlePrefix }}EnumHandler{lhs: handlers[i], rhs: series}
+	}
+	return series
+}
+
+type EnumHandling{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	handler {{ .TitlePrefix }}EnumHandler
+	count   int
+}
+
+func (it *EnumHandling{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	if it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		err := it.handler.Handle(it.count, next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "enum handling iterator: check")
+			}
+			it.err = err
+			return false
+		}
+		it.count++
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}EnumHandling sets handler while iterating over items with their serial number.
+// If handlers is empty, so it will do nothing.
+func {{ .TitlePrefix }}EnumHandling(items {{ .TitlePrefix }}Iterator, handlers ...{{ .TitlePrefix }}EnumHandler) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &EnumHandling{{ .TitlePrefix }}Iterator{
+		prepared{{ .TitlePrefix }}Item{base: items}, {{ .TitlePrefix }}EnumHandlerSeries(handlers...), 0}
+}
+
+func {{ .TitlePrefix }}Enumerate(items {{ .TitlePrefix }}Iterator, handler ...{{ .TitlePrefix }}EnumHandler) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}EnumHandling(items, handler...))
+}

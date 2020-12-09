@@ -1,0 +1,58 @@
+package {{ .PackageName }}
+
+import "github.com/pkg/errors"
+
+var EndOf{{ .TitlePrefix }}Iterator = errors.New("end of {{ .TypeName }} iterator")
+
+func isEndOf{{ .TitlePrefix }}Iterator(err error) bool {
+	return errors.Is(err, EndOf{{ .TitlePrefix }}Iterator)
+}
+
+func wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err error, msg string) error {
+	if err == nil {
+		return nil
+	}
+	if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+		err = errors.Wrap(err, msg)
+	}
+	return err
+}
+
+func panicIf{{ .TitlePrefix }}IteratorError(err error, block string) {
+	msg := "something went wrong"
+	if len(block) > 0 {
+		msg = block + ": " + msg
+	}
+	if err != nil {
+		panic(errors.Wrap(err, msg))
+	}
+}
+
+type prepared{{ .TitlePrefix }}Item struct {
+	base    {{ .TitlePrefix }}Iterator
+	hasNext bool
+	next    {{ .TypeName }}
+	err     error
+}
+
+func (it *prepared{{ .TitlePrefix }}Item) HasNext() bool {
+	it.hasNext = it.err == nil && it.base.HasNext()
+	return it.hasNext
+}
+
+func (it *prepared{{ .TitlePrefix }}Item) Next() {{ .TypeName }} {
+	if !it.hasNext {
+		panicIf{{ .TitlePrefix }}IteratorError(errors.New("no next"), "prepared: next")
+	}
+	next := it.next
+	it.hasNext = false
+	it.next = {{ .ZeroTypeValue }}
+	return next
+}
+
+func (it prepared{{ .TitlePrefix }}Item) Err() error {
+	if it.err != nil && !errors.Is(it.err, EndOf{{ .TitlePrefix }}Iterator) {
+		return it.err
+	}
+	return it.base.Err()
+}

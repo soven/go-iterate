@@ -1,0 +1,346 @@
+package {{ .PackageName }}
+
+import "github.com/pkg/errors"
+
+type {{ .TitlePrefix }}Checker interface {
+	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+	Check({{ .TypeName }}) (bool, error)
+}
+
+type {{ .TitlePrefix }}Check func({{ .TypeName }}) (bool, error)
+
+func (ch {{ .TitlePrefix }}Check) Check(item {{ .TypeName }}) (bool, error) { return ch(item) }
+
+var (
+	Always{{ .TitlePrefix }}CheckTrue  = {{ .TitlePrefix }}Check(func(item {{ .TypeName }}) (bool, error) { return true, nil })
+	Always{{ .TitlePrefix }}CheckFalse = {{ .TitlePrefix }}Check(func(item {{ .TypeName }}) (bool, error) { return false, nil })
+)
+
+func Not{{ .TitlePrefix }}(checker {{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Checker {
+	if checker == nil {
+		return Always{{ .TitlePrefix }}CheckTrue
+	}
+	return {{ .TitlePrefix }}Check(func(item {{ .TypeName }}) (bool, error) {
+		yes, err := checker.Check(item)
+		if err != nil {
+			// No error wrapping since an error context is missing.
+			return false, err
+		}
+
+		return !yes, nil
+	})
+}
+
+type and{{ .TitlePrefix }} struct {
+	lhs, rhs {{ .TitlePrefix }}Checker
+}
+
+func (a and{{ .TitlePrefix }}) Check(item {{ .TypeName }}) (bool, error) {
+	isLHSPassed, err := a.lhs.Check(item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "lhs check")
+	}
+	if !isLHSPassed {
+		return false, nil
+	}
+
+	isRHSPassed, err := a.rhs.Check(item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "rhs check")
+	}
+	return isRHSPassed, nil
+}
+
+func All{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Checker {
+	var all {{ .TitlePrefix }}Checker = Always{{ .TitlePrefix }}CheckTrue
+	for i := len(checkers) - 1; i >= 0; i-- {
+		if checkers[i] == nil {
+			continue
+		}
+		all = and{{ .TitlePrefix }}{checkers[i], all}
+	}
+	return all
+}
+
+type or{{ .TitlePrefix }} struct {
+	lhs, rhs {{ .TitlePrefix }}Checker
+}
+
+func (o or{{ .TitlePrefix }}) Check(item {{ .TypeName }}) (bool, error) {
+	isLHSPassed, err := o.lhs.Check(item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "lhs check")
+	}
+	if isLHSPassed {
+		return true, nil
+	}
+
+	isRHSPassed, err := o.rhs.Check(item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "rhs check")
+	}
+	return isRHSPassed, nil
+}
+
+func Any{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Checker {
+	var any {{ .TitlePrefix }}Checker = Always{{ .TitlePrefix }}CheckFalse
+	for i := len(checkers) - 1; i >= 0; i-- {
+		if checkers[i] == nil {
+			continue
+		}
+		any = or{{ .TitlePrefix }}{checkers[i], any}
+	}
+	return any
+}
+
+type Filtering{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	filter {{ .TitlePrefix }}Checker
+}
+
+func (it *Filtering{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		isFilterPassed, err := it.filter.Check(next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "filtering iterator: check")
+			}
+			it.err = err
+			return false
+		}
+
+		if !isFilterPassed {
+			continue
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}Filtering sets filter while iterating over items.
+// If filters is empty, so all items will return.
+func {{ .TitlePrefix }}Filtering(items {{ .TitlePrefix }}Iterator, filters ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &Filtering{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, All{{ .TitlePrefix }}(filters...)}
+}
+
+func {{ .TitlePrefix }}Filter(items {{ .TitlePrefix }}Iterator, checker ...{{ .TitlePrefix }}Checker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}Filtering(items, checker...))
+}
+
+type {{ .TitlePrefix }}EnumChecker interface {
+	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+	Check(int, {{ .TypeName }}) (bool, error)
+}
+
+type {{ .TitlePrefix }}EnumCheck func(int, {{ .TypeName }}) (bool, error)
+
+func (ch {{ .TitlePrefix }}EnumCheck) Check(n int, item {{ .TypeName }}) (bool, error) { return ch(n, item) }
+
+type enumFrom{{ .TitlePrefix }}Checker struct {
+	{{ .TitlePrefix }}Checker
+}
+
+func (ch enumFrom{{ .TitlePrefix }}Checker) Check(_ int, item {{ .TypeName }}) (bool, error) { return ch.{{ .TitlePrefix }}Checker.Check(item) }
+
+func EnumFrom{{ .TitlePrefix }}Checker(checker {{ .TitlePrefix }}Checker) {{ .TitlePrefix }}EnumChecker {
+	return &enumFrom{{ .TitlePrefix }}Checker{checker}
+}
+
+var (
+	Always{{ .TitlePrefix }}EnumCheckTrue  = EnumFrom{{ .TitlePrefix }}Checker(Always{{ .TitlePrefix }}CheckTrue)
+	Always{{ .TitlePrefix }}EnumCheckFalse = EnumFrom{{ .TitlePrefix }}Checker(Always{{ .TitlePrefix }}CheckFalse)
+)
+
+func EnumNot{{ .TitlePrefix }}(checker {{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}EnumChecker {
+	if checker == nil {
+		return Always{{ .TitlePrefix }}EnumCheckTrue
+	}
+	return {{ .TitlePrefix }}EnumCheck(func(n int, item {{ .TypeName }}) (bool, error) {
+		yes, err := checker.Check(n, item)
+		if err != nil {
+			// No error wrapping since an error context is missing.
+			return false, err
+		}
+
+		return !yes, nil
+	})
+}
+
+type enumAnd{{ .TitlePrefix }} struct {
+	lhs, rhs {{ .TitlePrefix }}EnumChecker
+}
+
+func (a enumAnd{{ .TitlePrefix }}) Check(n int, item {{ .TypeName }}) (bool, error) {
+	isLHSPassed, err := a.lhs.Check(n, item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "lhs check")
+	}
+	if !isLHSPassed {
+		return false, nil
+	}
+
+	isRHSPassed, err := a.rhs.Check(n, item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "rhs check")
+	}
+	return isRHSPassed, nil
+}
+
+func EnumAll{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}EnumChecker {
+	var all {{ .TitlePrefix }}EnumChecker = Always{{ .TitlePrefix }}EnumCheckTrue
+	for i := len(checkers) - 1; i >= 0; i-- {
+		if checkers[i] == nil {
+			continue
+		}
+		all = enumAnd{{ .TitlePrefix }} {checkers[i], all}
+	}
+	return all
+}
+
+type enumOr{{ .TitlePrefix }} struct {
+	lhs, rhs {{ .TitlePrefix }}EnumChecker
+}
+
+func (o enumOr{{ .TitlePrefix }}) Check(n int, item {{ .TypeName }}) (bool, error) {
+	isLHSPassed, err := o.lhs.Check(n, item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "lhs check")
+	}
+	if isLHSPassed {
+		return true, nil
+	}
+
+	isRHSPassed, err := o.rhs.Check(n, item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "rhs check")
+	}
+	return isRHSPassed, nil
+}
+
+func EnumAny{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}EnumChecker {
+	var any {{ .TitlePrefix }}EnumChecker = Always{{ .TitlePrefix }}EnumCheckFalse
+	for i := len(checkers) - 1; i >= 0; i-- {
+		if checkers[i] == nil {
+			continue
+		}
+		any = enumOr{{ .TitlePrefix }}{checkers[i], any}
+	}
+	return any
+}
+
+type EnumFiltering{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	filter {{ .TitlePrefix }}EnumChecker
+	count  int
+}
+
+func (it *EnumFiltering{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		isFilterPassed, err := it.filter.Check(it.count, next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "enum filtering iterator: check")
+			}
+			it.err = err
+			return false
+		}
+		it.count++
+
+		if !isFilterPassed {
+			continue
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}EnumFiltering sets filter while iterating over items and their serial numbers.
+// If filters is empty, so all items will return.
+func {{ .TitlePrefix }}EnumFiltering(items {{ .TitlePrefix }}Iterator, filters ...{{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &EnumFiltering{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, EnumAll{{ .TitlePrefix }}(filters...), 0}
+}
+
+type DoingUntil{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	until {{ .TitlePrefix }}Checker
+}
+
+func (it *DoingUntil{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOf{{ .TitlePrefix }}Iterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}DoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func {{ .TitlePrefix }}DoingUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &DoingUntil{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, All{{ .TitlePrefix }}(untilList...)}
+}
+
+func {{ .TitlePrefix }}DoUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}Checker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}DoingUntil(items, untilList...))
+}
+
+// {{ .TitlePrefix }}GettingBatch returns the next batch from items.
+func {{ .TitlePrefix }}GettingBatch(items {{ .TitlePrefix }}Iterator, batchSize int) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	if batchSize == 0 {
+		return items
+	}
+
+	size := 0
+	return {{ .TitlePrefix }}DoingUntil(items, {{ .TitlePrefix }}Check(func(item {{ .TypeName }}) (bool, error) {
+		size++
+		return size >= batchSize, nil
+	}))
+}

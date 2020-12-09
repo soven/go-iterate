@@ -1,0 +1,84 @@
+package {{ .PackageName }}
+
+import "github.com/pkg/errors"
+
+type {{ .TitlePrefix }}Converter interface {
+	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+	Convert({{ .TypeName }}) ({{ .TypeName }}, error)
+}
+
+type {{ .TitlePrefix }}Convert func({{ .TypeName }}) ({{ .TypeName }}, error)
+
+func (c {{ .TitlePrefix }}Convert) Convert(item {{ .TypeName }}) ({{ .TypeName }}, error) { return c(item) }
+
+var No{{ .TitlePrefix }}Convert = {{ .TitlePrefix }}Convert(func(item {{ .TypeName }}) ({{ .TypeName }}, error) { return item, nil })
+
+type double{{ .TitlePrefix }}Converter struct {
+	lhs, rhs {{ .TitlePrefix }}Converter
+}
+
+func (c double{{ .TitlePrefix }}Converter) Convert(item {{ .TypeName }}) ({{ .TypeName }}, error) {
+	item, err := c.lhs.Convert(item)
+	if err != nil {
+		return {{ .ZeroTypeValue }}, errors.Wrap(err, "convert lhs")
+	}
+	item, err = c.rhs.Convert(item)
+	if err != nil {
+		return {{ .ZeroTypeValue }}, errors.Wrap(err, "convert rhs")
+	}
+	return item, nil
+}
+
+func {{ .TitlePrefix }}ConverterSeries(converters ...{{ .TitlePrefix }}Converter) {{ .TitlePrefix }}Converter {
+	var series {{ .TitlePrefix }}Converter = No{{ .TitlePrefix }}Convert
+	for i := len(converters) - 1; i >= 0; i-- {
+		if converters[i] == nil {
+			continue
+		}
+		series = double{{ .TitlePrefix }}Converter{lhs: converters[i], rhs: series}
+	}
+
+	return series
+}
+
+type Converting{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	converter {{ .TitlePrefix }}Converter
+}
+
+func (it *Converting{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	if it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		next, err := it.converter.Convert(next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "filtering iterator: check")
+			}
+			it.err = err
+			return false
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}Converting sets converter while iterating over items.
+// If converters is empty, so all items will not be affected.
+func {{ .TitlePrefix }}Converting(items {{ .TitlePrefix }}Iterator, converters ...{{ .TitlePrefix }}Converter) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &Converting{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, {{ .TitlePrefix }}ConverterSeries(converters...)}
+}
+
+func {{ .TitlePrefix }}Map(items {{ .TitlePrefix }}Iterator, converter ...{{ .TitlePrefix }}Converter) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}Converting(items, converter...))
+}

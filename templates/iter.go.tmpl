@@ -1,0 +1,41 @@
+package {{ .PackageName }}
+
+type {{ .TitlePrefix }}Iterator interface {
+	// HasNext checks if there is the next item
+	// in the iterator. HasNext should be idempotent.
+	HasNext() bool
+	// Next should be invoked after check HasNext.
+	Next() {{ .TypeName }}
+	// Err contains first met error while Next.
+	Err() error
+}
+
+type empty{{ .TitlePrefix }}Iterator struct{}
+
+func (empty{{ .TitlePrefix }}Iterator) HasNext() bool                { return false }
+func (empty{{ .TitlePrefix }}Iterator) Next() (next {{ .TypeName }}) { return {{ .ZeroTypeValue }} }
+func (empty{{ .TitlePrefix }}Iterator) Err() error                   { return nil }
+
+var Empty{{ .TitlePrefix }}Iterator = empty{{ .TitlePrefix }}Iterator{}
+
+type {{ .TitlePrefix }}IterMaker interface {
+	MakeIter() ({{ .TitlePrefix }}Iterator, error)
+}
+
+type Make{{ .TitlePrefix }}Iter func() ({{ .TitlePrefix }}Iterator, error)
+
+func (m Make{{ .TitlePrefix }}Iter) MakeIter() ({{ .TitlePrefix }}Iterator, error) { return m() }
+
+var MakeNo{{ .TitlePrefix }}Iter = Make{{ .TitlePrefix }}Iter(func() ({{ .TitlePrefix }}Iterator, error) { return Empty{{ .TitlePrefix }}Iterator, nil })
+
+// {{ .TitlePrefix }}Discard just range over all items and do nothing with each of them.
+func {{ .TitlePrefix }}Discard(items {{ .TitlePrefix }}Iterator) error {
+	if items == nil {
+		return nil
+	}
+	for items.HasNext() {
+		_ = items.Next()
+	}
+	// no error wrapping since no additional context for the error; just return it.
+	return items.Err()
+}

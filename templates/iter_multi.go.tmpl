@@ -1,0 +1,41 @@
+package {{ .PackageName }}
+
+type double{{ .TitlePrefix }}Iterator struct {
+	lhs, rhs {{ .TitlePrefix }}Iterator
+	inRHS    bool
+}
+
+func (it *double{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if !it.inRHS {
+		if it.lhs.HasNext() {
+			return true
+		}
+		it.inRHS = true
+	}
+	return it.rhs.HasNext()
+}
+
+func (it *double{{ .TitlePrefix }}Iterator) Next() {{ .TypeName }} {
+	if !it.inRHS {
+		return it.lhs.Next()
+	}
+	return it.rhs.Next()
+}
+
+func (it *double{{ .TitlePrefix }}Iterator) Err() error {
+	if !it.inRHS {
+		return it.lhs.Err()
+	}
+	return it.rhs.Err()
+}
+
+func Super{{ .TitlePrefix }}Iterator(itemList ...{{ .TitlePrefix }}Iterator) {{ .TitlePrefix }}Iterator {
+	var super {{ .TitlePrefix }}Iterator = Empty{{ .TitlePrefix }}Iterator
+	for i := len(itemList) - 1; i >= 0; i-- {
+		if itemList[i] == nil {
+			continue
+		}
+		super = &double{{ .TitlePrefix }}Iterator{lhs: itemList[i], rhs: super}
+	}
+	return super
+}
