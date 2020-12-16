@@ -3,20 +3,33 @@ package iter
 
 import "github.com/pkg/errors"
 
+// Int16Checker is an object checking an item type of int16
+// for some condition.
 type Int16Checker interface {
+	// Check should check an item type of int16 for some condition.
 	// It is suggested to return EndOfInt16Iterator to stop iteration.
 	Check(int16) (bool, error)
 }
 
+// Int16Check is a shortcut implementation
+// of Int16Checker based on a function.
 type Int16Check func(int16) (bool, error)
 
+// Check checks an item type of int16 for some condition.
+// It returns EndOfInt16Iterator to stop iteration.
 func (ch Int16Check) Check(item int16) (bool, error) { return ch(item) }
 
 var (
-	AlwaysInt16CheckTrue  = Int16Check(func(item int16) (bool, error) { return true, nil })
-	AlwaysInt16CheckFalse = Int16Check(func(item int16) (bool, error) { return false, nil })
+	// AlwaysInt16CheckTrue always returns true and empty error.
+	AlwaysInt16CheckTrue Int16Checker = Int16Check(
+		func(item int16) (bool, error) { return true, nil })
+	// AlwaysInt16CheckFalse always returns false and empty error.
+	AlwaysInt16CheckFalse Int16Checker = Int16Check(
+		func(item int16) (bool, error) { return false, nil })
 )
 
+// NotInt16 do an inversion for checker result.
+// It is returns AlwaysInt16CheckTrue if checker is nil.
 func NotInt16(checker Int16Checker) Int16Checker {
 	if checker == nil {
 		return AlwaysInt16CheckTrue
@@ -52,8 +65,11 @@ func (a andInt16) Check(item int16) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AllInt16 combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true checker if the list of checkers is empty.
 func AllInt16(checkers ...Int16Checker) Int16Checker {
-	var all Int16Checker = AlwaysInt16CheckTrue
+	var all = AlwaysInt16CheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -83,8 +99,11 @@ func (o orInt16) Check(item int16) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AnyInt16 combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func AnyInt16(checkers ...Int16Checker) Int16Checker {
-	var any Int16Checker = AlwaysInt16CheckFalse
+	var any = AlwaysInt16CheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -94,11 +113,15 @@ func AnyInt16(checkers ...Int16Checker) Int16Checker {
 	return any
 }
 
+// FilteringInt16Iterator does iteration with
+// filtering by previously set checker.
 type FilteringInt16Iterator struct {
 	preparedInt16Item
 	filter Int16Checker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *FilteringInt16Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -135,18 +158,20 @@ func Int16Filtering(items Int16Iterator, filters ...Int16Checker) Int16Iterator 
 	return &FilteringInt16Iterator{preparedInt16Item{base: items}, AllInt16(filters...)}
 }
 
-func Int16Filter(items Int16Iterator, checker ...Int16Checker) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Int16Discard(Int16Filtering(items, checker...))
-}
-
+// Int16EnumChecker is an object checking an item type of int16
+// and its ordering number in for some condition.
 type Int16EnumChecker interface {
+	// Check checks an item type of int16 and its ordering number for some condition.
 	// It is suggested to return EndOfInt16Iterator to stop iteration.
 	Check(int, int16) (bool, error)
 }
 
+// Int16EnumCheck is a shortcut implementation
+// of Int16EnumChecker based on a function.
 type Int16EnumCheck func(int, int16) (bool, error)
 
+// Check checks an item type of int16 and its ordering number for some condition.
+// It returns EndOfInt16Iterator to stop iteration.
 func (ch Int16EnumCheck) Check(n int, item int16) (bool, error) { return ch(n, item) }
 
 type enumFromInt16Checker struct {
@@ -157,15 +182,27 @@ func (ch enumFromInt16Checker) Check(_ int, item int16) (bool, error) {
 	return ch.Int16Checker.Check(item)
 }
 
+// EnumFromInt16Checker adapts checker type of Int16Checker
+// to the interface Int16EnumChecker.
+// If checker is nil it is return based on AlwaysInt16CheckFalse enum checker.
 func EnumFromInt16Checker(checker Int16Checker) Int16EnumChecker {
+	if checker == nil {
+		checker = AlwaysInt16CheckFalse
+	}
 	return &enumFromInt16Checker{checker}
 }
 
 var (
-	AlwaysInt16EnumCheckTrue  = EnumFromInt16Checker(AlwaysInt16CheckTrue)
-	AlwaysInt16EnumCheckFalse = EnumFromInt16Checker(AlwaysInt16CheckFalse)
+	// AlwaysInt16EnumCheckTrue always returns true and empty error.
+	AlwaysInt16EnumCheckTrue Int16EnumChecker = EnumFromInt16Checker(
+		AlwaysInt16CheckTrue)
+	// AlwaysInt16EnumCheckFalse always returns false and empty error.
+	AlwaysInt16EnumCheckFalse Int16EnumChecker = EnumFromInt16Checker(
+		AlwaysInt16CheckFalse)
 )
 
+// EnumNotInt16 do an inversion for checker result.
+// It is returns AlwaysInt16EnumCheckTrue if checker is nil.
 func EnumNotInt16(checker Int16EnumChecker) Int16EnumChecker {
 	if checker == nil {
 		return AlwaysInt16EnumCheckTrue
@@ -201,8 +238,11 @@ func (a enumAndInt16) Check(n int, item int16) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAllInt16 combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true if the list of checkers is empty.
 func EnumAllInt16(checkers ...Int16EnumChecker) Int16EnumChecker {
-	var all Int16EnumChecker = AlwaysInt16EnumCheckTrue
+	var all = AlwaysInt16EnumCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -232,8 +272,11 @@ func (o enumOrInt16) Check(n int, item int16) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAnyInt16 combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func EnumAnyInt16(checkers ...Int16EnumChecker) Int16EnumChecker {
-	var any Int16EnumChecker = AlwaysInt16EnumCheckFalse
+	var any = AlwaysInt16EnumCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -243,12 +286,16 @@ func EnumAnyInt16(checkers ...Int16EnumChecker) Int16EnumChecker {
 	return any
 }
 
+// EnumFilteringInt16Iterator does iteration with
+// filtering by previously set checker.
 type EnumFilteringInt16Iterator struct {
 	preparedInt16Item
 	filter Int16EnumChecker
 	count  int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumFilteringInt16Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -286,11 +333,15 @@ func Int16EnumFiltering(items Int16Iterator, filters ...Int16EnumChecker) Int16I
 	return &EnumFilteringInt16Iterator{preparedInt16Item{base: items}, EnumAllInt16(filters...), 0}
 }
 
+// DoingUntilInt16Iterator does iteration
+// until previously set checker is passed.
 type DoingUntilInt16Iterator struct {
 	preparedInt16Item
 	until Int16Checker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *DoingUntilInt16Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -327,7 +378,8 @@ func Int16DoingUntil(items Int16Iterator, untilList ...Int16Checker) Int16Iterat
 	return &DoingUntilInt16Iterator{preparedInt16Item{base: items}, AllInt16(untilList...)}
 }
 
-func Int16DoUntil(items Int16Iterator, untilList ...Int16Checker) error {
+// Int16SkipUntil sets until conditions to skip few items.
+func Int16SkipUntil(items Int16Iterator, untilList ...Int16Checker) error {
 	// no error wrapping since no additional context for the error; just return it.
 	return Int16Discard(Int16DoingUntil(items, untilList...))
 }

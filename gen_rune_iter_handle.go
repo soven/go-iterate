@@ -3,16 +3,23 @@ package iter
 
 import "github.com/pkg/errors"
 
+// RuneHandler is an object handling an item type of rune.
 type RuneHandler interface {
+	// Handle should do something with item of rune.
 	// It is suggested to return EndOfRuneIterator to stop iteration.
 	Handle(rune) error
 }
 
+// RuneHandle is a shortcut implementation
+// of RuneHandler based on a function.
 type RuneHandle func(rune) error
 
+// Handle does something with item of rune.
+// It is suggested to return EndOfRuneIterator to stop iteration.
 func (h RuneHandle) Handle(item rune) error { return h(item) }
 
-var RuneDoNothing = RuneHandle(func(_ rune) error { return nil })
+// RuneDoNothing does nothing.
+var RuneDoNothing RuneHandler = RuneHandle(func(_ rune) error { return nil })
 
 type doubleRuneHandler struct {
 	lhs, rhs RuneHandler
@@ -30,8 +37,10 @@ func (h doubleRuneHandler) Handle(item rune) error {
 	return nil
 }
 
+// RuneHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func RuneHandlerSeries(handlers ...RuneHandler) RuneHandler {
-	var series RuneHandler = RuneDoNothing
+	var series = RuneDoNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
 		if handlers[i] == nil {
 			continue
@@ -41,11 +50,15 @@ func RuneHandlerSeries(handlers ...RuneHandler) RuneHandler {
 	return series
 }
 
+// HandlingRuneIterator does iteration with
+// handling by previously set handler.
 type HandlingRuneIterator struct {
 	preparedRuneItem
 	handler RuneHandler
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *HandlingRuneIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -75,23 +88,26 @@ func RuneHandling(items RuneIterator, handlers ...RuneHandler) RuneIterator {
 	if items == nil {
 		return EmptyRuneIterator
 	}
-	return &HandlingRuneIterator{preparedRuneItem{base: items}, RuneHandlerSeries(handlers...)}
+	return &HandlingRuneIterator{
+		preparedRuneItem{base: items}, RuneHandlerSeries(handlers...)}
 }
 
-func RuneRange(items RuneIterator, handler ...RuneHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return RuneDiscard(RuneHandling(items, handler...))
-}
-
+// RuneEnumHandler is an object handling an item type of rune and its ordered number.
 type RuneEnumHandler interface {
+	// Handle should do something with item of rune and its ordered number.
 	// It is suggested to return EndOfRuneIterator to stop iteration.
 	Handle(int, rune) error
 }
 
+// RuneEnumHandle is a shortcut implementation
+// of RuneEnumHandler based on a function.
 type RuneEnumHandle func(int, rune) error
 
+// Handle does something with item of rune and its ordered number.
+// It is suggested to return EndOfRuneIterator to stop iteration.
 func (h RuneEnumHandle) Handle(n int, item rune) error { return h(n, item) }
 
+// RuneDoEnumNothing does nothing.
 var RuneDoEnumNothing = RuneEnumHandle(func(_ int, _ rune) error { return nil })
 
 type doubleRuneEnumHandler struct {
@@ -110,6 +126,8 @@ func (h doubleRuneEnumHandler) Handle(n int, item rune) error {
 	return nil
 }
 
+// RuneEnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func RuneEnumHandlerSeries(handlers ...RuneEnumHandler) RuneEnumHandler {
 	var series RuneEnumHandler = RuneDoEnumNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
@@ -121,12 +139,16 @@ func RuneEnumHandlerSeries(handlers ...RuneEnumHandler) RuneEnumHandler {
 	return series
 }
 
+// EnumHandlingRuneIterator does iteration with
+// handling by previously set handler.
 type EnumHandlingRuneIterator struct {
 	preparedRuneItem
 	handler RuneEnumHandler
 	count   int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumHandlingRuneIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -159,9 +181,4 @@ func RuneEnumHandling(items RuneIterator, handlers ...RuneEnumHandler) RuneItera
 	}
 	return &EnumHandlingRuneIterator{
 		preparedRuneItem{base: items}, RuneEnumHandlerSeries(handlers...), 0}
-}
-
-func RuneEnumerate(items RuneIterator, handler ...RuneEnumHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return RuneDiscard(RuneEnumHandling(items, handler...))
 }

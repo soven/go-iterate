@@ -3,6 +3,8 @@ package iter
 
 import "github.com/pkg/errors"
 
+// EndOfRuneIterator is an error to stop iterating over an iterator.
+// It is used in some method of the package.
 var EndOfRuneIterator = errors.New("end of rune iterator")
 
 func isEndOfRuneIterator(err error) bool {
@@ -43,7 +45,8 @@ func (it *preparedRuneItem) HasNext() bool {
 
 func (it *preparedRuneItem) Next() rune {
 	if !it.hasNext {
-		panicIfRuneIteratorError(errors.New("no next"), "prepared: next")
+		panicIfRuneIteratorError(
+			errors.New("no next"), "prepared: next")
 	}
 	next := it.next
 	it.hasNext = false

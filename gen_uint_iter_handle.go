@@ -3,16 +3,23 @@ package iter
 
 import "github.com/pkg/errors"
 
+// UintHandler is an object handling an item type of uint.
 type UintHandler interface {
+	// Handle should do something with item of uint.
 	// It is suggested to return EndOfUintIterator to stop iteration.
 	Handle(uint) error
 }
 
+// UintHandle is a shortcut implementation
+// of UintHandler based on a function.
 type UintHandle func(uint) error
 
+// Handle does something with item of uint.
+// It is suggested to return EndOfUintIterator to stop iteration.
 func (h UintHandle) Handle(item uint) error { return h(item) }
 
-var UintDoNothing = UintHandle(func(_ uint) error { return nil })
+// UintDoNothing does nothing.
+var UintDoNothing UintHandler = UintHandle(func(_ uint) error { return nil })
 
 type doubleUintHandler struct {
 	lhs, rhs UintHandler
@@ -30,8 +37,10 @@ func (h doubleUintHandler) Handle(item uint) error {
 	return nil
 }
 
+// UintHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func UintHandlerSeries(handlers ...UintHandler) UintHandler {
-	var series UintHandler = UintDoNothing
+	var series = UintDoNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
 		if handlers[i] == nil {
 			continue
@@ -41,11 +50,15 @@ func UintHandlerSeries(handlers ...UintHandler) UintHandler {
 	return series
 }
 
+// HandlingUintIterator does iteration with
+// handling by previously set handler.
 type HandlingUintIterator struct {
 	preparedUintItem
 	handler UintHandler
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *HandlingUintIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -75,23 +88,26 @@ func UintHandling(items UintIterator, handlers ...UintHandler) UintIterator {
 	if items == nil {
 		return EmptyUintIterator
 	}
-	return &HandlingUintIterator{preparedUintItem{base: items}, UintHandlerSeries(handlers...)}
+	return &HandlingUintIterator{
+		preparedUintItem{base: items}, UintHandlerSeries(handlers...)}
 }
 
-func UintRange(items UintIterator, handler ...UintHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return UintDiscard(UintHandling(items, handler...))
-}
-
+// UintEnumHandler is an object handling an item type of uint and its ordered number.
 type UintEnumHandler interface {
+	// Handle should do something with item of uint and its ordered number.
 	// It is suggested to return EndOfUintIterator to stop iteration.
 	Handle(int, uint) error
 }
 
+// UintEnumHandle is a shortcut implementation
+// of UintEnumHandler based on a function.
 type UintEnumHandle func(int, uint) error
 
+// Handle does something with item of uint and its ordered number.
+// It is suggested to return EndOfUintIterator to stop iteration.
 func (h UintEnumHandle) Handle(n int, item uint) error { return h(n, item) }
 
+// UintDoEnumNothing does nothing.
 var UintDoEnumNothing = UintEnumHandle(func(_ int, _ uint) error { return nil })
 
 type doubleUintEnumHandler struct {
@@ -110,6 +126,8 @@ func (h doubleUintEnumHandler) Handle(n int, item uint) error {
 	return nil
 }
 
+// UintEnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func UintEnumHandlerSeries(handlers ...UintEnumHandler) UintEnumHandler {
 	var series UintEnumHandler = UintDoEnumNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
@@ -121,12 +139,16 @@ func UintEnumHandlerSeries(handlers ...UintEnumHandler) UintEnumHandler {
 	return series
 }
 
+// EnumHandlingUintIterator does iteration with
+// handling by previously set handler.
 type EnumHandlingUintIterator struct {
 	preparedUintItem
 	handler UintEnumHandler
 	count   int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumHandlingUintIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -159,9 +181,4 @@ func UintEnumHandling(items UintIterator, handlers ...UintEnumHandler) UintItera
 	}
 	return &EnumHandlingUintIterator{
 		preparedUintItem{base: items}, UintEnumHandlerSeries(handlers...), 0}
-}
-
-func UintEnumerate(items UintIterator, handler ...UintEnumHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return UintDiscard(UintEnumHandling(items, handler...))
 }

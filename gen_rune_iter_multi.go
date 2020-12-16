@@ -30,6 +30,7 @@ func (it *doubleRuneIterator) Err() error {
 	return it.rhs.Err()
 }
 
+// SuperRuneIterator combines all iterators to one.
 func SuperRuneIterator(itemList ...RuneIterator) RuneIterator {
 	var super RuneIterator = EmptyRuneIterator
 	for i := len(itemList) - 1; i >= 0; i-- {

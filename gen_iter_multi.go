@@ -30,6 +30,7 @@ func (it *doubleIterator) Err() error {
 	return it.rhs.Err()
 }
 
+// SuperIterator combines all iterators to one.
 func SuperIterator(itemList ...Iterator) Iterator {
 	var super Iterator = EmptyIterator
 	for i := len(itemList) - 1; i >= 0; i-- {

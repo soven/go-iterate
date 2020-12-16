@@ -3,16 +3,23 @@ package iter
 
 import "github.com/pkg/errors"
 
+// Handler is an object handling an item type of interface{}.
 type Handler interface {
+	// Handle should do something with item of interface{}.
 	// It is suggested to return EndOfIterator to stop iteration.
 	Handle(interface{}) error
 }
 
+// Handle is a shortcut implementation
+// of Handler based on a function.
 type Handle func(interface{}) error
 
+// Handle does something with item of interface{}.
+// It is suggested to return EndOfIterator to stop iteration.
 func (h Handle) Handle(item interface{}) error { return h(item) }
 
-var DoNothing = Handle(func(_ interface{}) error { return nil })
+// DoNothing does nothing.
+var DoNothing Handler = Handle(func(_ interface{}) error { return nil })
 
 type doubleHandler struct {
 	lhs, rhs Handler
@@ -30,8 +37,10 @@ func (h doubleHandler) Handle(item interface{}) error {
 	return nil
 }
 
+// HandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func HandlerSeries(handlers ...Handler) Handler {
-	var series Handler = DoNothing
+	var series = DoNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
 		if handlers[i] == nil {
 			continue
@@ -41,11 +50,15 @@ func HandlerSeries(handlers ...Handler) Handler {
 	return series
 }
 
+// HandlingIterator does iteration with
+// handling by previously set handler.
 type HandlingIterator struct {
 	preparedItem
 	handler Handler
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *HandlingIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -75,23 +88,26 @@ func Handling(items Iterator, handlers ...Handler) Iterator {
 	if items == nil {
 		return EmptyIterator
 	}
-	return &HandlingIterator{preparedItem{base: items}, HandlerSeries(handlers...)}
+	return &HandlingIterator{
+		preparedItem{base: items}, HandlerSeries(handlers...)}
 }
 
-func Range(items Iterator, handler ...Handler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Discard(Handling(items, handler...))
-}
-
+// EnumHandler is an object handling an item type of interface{} and its ordered number.
 type EnumHandler interface {
+	// Handle should do something with item of interface{} and its ordered number.
 	// It is suggested to return EndOfIterator to stop iteration.
 	Handle(int, interface{}) error
 }
 
+// EnumHandle is a shortcut implementation
+// of EnumHandler based on a function.
 type EnumHandle func(int, interface{}) error
 
+// Handle does something with item of interface{} and its ordered number.
+// It is suggested to return EndOfIterator to stop iteration.
 func (h EnumHandle) Handle(n int, item interface{}) error { return h(n, item) }
 
+// DoEnumNothing does nothing.
 var DoEnumNothing = EnumHandle(func(_ int, _ interface{}) error { return nil })
 
 type doubleEnumHandler struct {
@@ -110,6 +126,8 @@ func (h doubleEnumHandler) Handle(n int, item interface{}) error {
 	return nil
 }
 
+// EnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func EnumHandlerSeries(handlers ...EnumHandler) EnumHandler {
 	var series EnumHandler = DoEnumNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
@@ -121,12 +139,16 @@ func EnumHandlerSeries(handlers ...EnumHandler) EnumHandler {
 	return series
 }
 
+// EnumHandlingIterator does iteration with
+// handling by previously set handler.
 type EnumHandlingIterator struct {
 	preparedItem
 	handler EnumHandler
 	count   int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumHandlingIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -159,9 +181,4 @@ func EnumHandling(items Iterator, handlers ...EnumHandler) Iterator {
 	}
 	return &EnumHandlingIterator{
 		preparedItem{base: items}, EnumHandlerSeries(handlers...), 0}
-}
-
-func Enumerate(items Iterator, handler ...EnumHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Discard(EnumHandling(items, handler...))
 }

@@ -3,20 +3,33 @@ package iter
 
 import "github.com/pkg/errors"
 
+// IntChecker is an object checking an item type of int
+// for some condition.
 type IntChecker interface {
+	// Check should check an item type of int for some condition.
 	// It is suggested to return EndOfIntIterator to stop iteration.
 	Check(int) (bool, error)
 }
 
+// IntCheck is a shortcut implementation
+// of IntChecker based on a function.
 type IntCheck func(int) (bool, error)
 
+// Check checks an item type of int for some condition.
+// It returns EndOfIntIterator to stop iteration.
 func (ch IntCheck) Check(item int) (bool, error) { return ch(item) }
 
 var (
-	AlwaysIntCheckTrue  = IntCheck(func(item int) (bool, error) { return true, nil })
-	AlwaysIntCheckFalse = IntCheck(func(item int) (bool, error) { return false, nil })
+	// AlwaysIntCheckTrue always returns true and empty error.
+	AlwaysIntCheckTrue IntChecker = IntCheck(
+		func(item int) (bool, error) { return true, nil })
+	// AlwaysIntCheckFalse always returns false and empty error.
+	AlwaysIntCheckFalse IntChecker = IntCheck(
+		func(item int) (bool, error) { return false, nil })
 )
 
+// NotInt do an inversion for checker result.
+// It is returns AlwaysIntCheckTrue if checker is nil.
 func NotInt(checker IntChecker) IntChecker {
 	if checker == nil {
 		return AlwaysIntCheckTrue
@@ -52,8 +65,11 @@ func (a andInt) Check(item int) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AllInt combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true checker if the list of checkers is empty.
 func AllInt(checkers ...IntChecker) IntChecker {
-	var all IntChecker = AlwaysIntCheckTrue
+	var all = AlwaysIntCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -83,8 +99,11 @@ func (o orInt) Check(item int) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AnyInt combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func AnyInt(checkers ...IntChecker) IntChecker {
-	var any IntChecker = AlwaysIntCheckFalse
+	var any = AlwaysIntCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -94,11 +113,15 @@ func AnyInt(checkers ...IntChecker) IntChecker {
 	return any
 }
 
+// FilteringIntIterator does iteration with
+// filtering by previously set checker.
 type FilteringIntIterator struct {
 	preparedIntItem
 	filter IntChecker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *FilteringIntIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -135,35 +158,51 @@ func IntFiltering(items IntIterator, filters ...IntChecker) IntIterator {
 	return &FilteringIntIterator{preparedIntItem{base: items}, AllInt(filters...)}
 }
 
-func IntFilter(items IntIterator, checker ...IntChecker) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return IntDiscard(IntFiltering(items, checker...))
-}
-
+// IntEnumChecker is an object checking an item type of int
+// and its ordering number in for some condition.
 type IntEnumChecker interface {
+	// Check checks an item type of int and its ordering number for some condition.
 	// It is suggested to return EndOfIntIterator to stop iteration.
 	Check(int, int) (bool, error)
 }
 
+// IntEnumCheck is a shortcut implementation
+// of IntEnumChecker based on a function.
 type IntEnumCheck func(int, int) (bool, error)
 
+// Check checks an item type of int and its ordering number for some condition.
+// It returns EndOfIntIterator to stop iteration.
 func (ch IntEnumCheck) Check(n int, item int) (bool, error) { return ch(n, item) }
 
 type enumFromIntChecker struct {
 	IntChecker
 }
 
-func (ch enumFromIntChecker) Check(_ int, item int) (bool, error) { return ch.IntChecker.Check(item) }
+func (ch enumFromIntChecker) Check(_ int, item int) (bool, error) {
+	return ch.IntChecker.Check(item)
+}
 
+// EnumFromIntChecker adapts checker type of IntChecker
+// to the interface IntEnumChecker.
+// If checker is nil it is return based on AlwaysIntCheckFalse enum checker.
 func EnumFromIntChecker(checker IntChecker) IntEnumChecker {
+	if checker == nil {
+		checker = AlwaysIntCheckFalse
+	}
 	return &enumFromIntChecker{checker}
 }
 
 var (
-	AlwaysIntEnumCheckTrue  = EnumFromIntChecker(AlwaysIntCheckTrue)
-	AlwaysIntEnumCheckFalse = EnumFromIntChecker(AlwaysIntCheckFalse)
+	// AlwaysIntEnumCheckTrue always returns true and empty error.
+	AlwaysIntEnumCheckTrue IntEnumChecker = EnumFromIntChecker(
+		AlwaysIntCheckTrue)
+	// AlwaysIntEnumCheckFalse always returns false and empty error.
+	AlwaysIntEnumCheckFalse IntEnumChecker = EnumFromIntChecker(
+		AlwaysIntCheckFalse)
 )
 
+// EnumNotInt do an inversion for checker result.
+// It is returns AlwaysIntEnumCheckTrue if checker is nil.
 func EnumNotInt(checker IntEnumChecker) IntEnumChecker {
 	if checker == nil {
 		return AlwaysIntEnumCheckTrue
@@ -199,8 +238,11 @@ func (a enumAndInt) Check(n int, item int) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAllInt combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true if the list of checkers is empty.
 func EnumAllInt(checkers ...IntEnumChecker) IntEnumChecker {
-	var all IntEnumChecker = AlwaysIntEnumCheckTrue
+	var all = AlwaysIntEnumCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -230,8 +272,11 @@ func (o enumOrInt) Check(n int, item int) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAnyInt combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func EnumAnyInt(checkers ...IntEnumChecker) IntEnumChecker {
-	var any IntEnumChecker = AlwaysIntEnumCheckFalse
+	var any = AlwaysIntEnumCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -241,12 +286,16 @@ func EnumAnyInt(checkers ...IntEnumChecker) IntEnumChecker {
 	return any
 }
 
+// EnumFilteringIntIterator does iteration with
+// filtering by previously set checker.
 type EnumFilteringIntIterator struct {
 	preparedIntItem
 	filter IntEnumChecker
 	count  int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumFilteringIntIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -284,11 +333,15 @@ func IntEnumFiltering(items IntIterator, filters ...IntEnumChecker) IntIterator 
 	return &EnumFilteringIntIterator{preparedIntItem{base: items}, EnumAllInt(filters...), 0}
 }
 
+// DoingUntilIntIterator does iteration
+// until previously set checker is passed.
 type DoingUntilIntIterator struct {
 	preparedIntItem
 	until IntChecker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *DoingUntilIntIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -325,7 +378,8 @@ func IntDoingUntil(items IntIterator, untilList ...IntChecker) IntIterator {
 	return &DoingUntilIntIterator{preparedIntItem{base: items}, AllInt(untilList...)}
 }
 
-func IntDoUntil(items IntIterator, untilList ...IntChecker) error {
+// IntSkipUntil sets until conditions to skip few items.
+func IntSkipUntil(items IntIterator, untilList ...IntChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
 	return IntDiscard(IntDoingUntil(items, untilList...))
 }

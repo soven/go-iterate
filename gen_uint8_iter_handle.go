@@ -3,16 +3,23 @@ package iter
 
 import "github.com/pkg/errors"
 
+// Uint8Handler is an object handling an item type of uint8.
 type Uint8Handler interface {
+	// Handle should do something with item of uint8.
 	// It is suggested to return EndOfUint8Iterator to stop iteration.
 	Handle(uint8) error
 }
 
+// Uint8Handle is a shortcut implementation
+// of Uint8Handler based on a function.
 type Uint8Handle func(uint8) error
 
+// Handle does something with item of uint8.
+// It is suggested to return EndOfUint8Iterator to stop iteration.
 func (h Uint8Handle) Handle(item uint8) error { return h(item) }
 
-var Uint8DoNothing = Uint8Handle(func(_ uint8) error { return nil })
+// Uint8DoNothing does nothing.
+var Uint8DoNothing Uint8Handler = Uint8Handle(func(_ uint8) error { return nil })
 
 type doubleUint8Handler struct {
 	lhs, rhs Uint8Handler
@@ -30,8 +37,10 @@ func (h doubleUint8Handler) Handle(item uint8) error {
 	return nil
 }
 
+// Uint8HandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func Uint8HandlerSeries(handlers ...Uint8Handler) Uint8Handler {
-	var series Uint8Handler = Uint8DoNothing
+	var series = Uint8DoNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
 		if handlers[i] == nil {
 			continue
@@ -41,11 +50,15 @@ func Uint8HandlerSeries(handlers ...Uint8Handler) Uint8Handler {
 	return series
 }
 
+// HandlingUint8Iterator does iteration with
+// handling by previously set handler.
 type HandlingUint8Iterator struct {
 	preparedUint8Item
 	handler Uint8Handler
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *HandlingUint8Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -75,23 +88,26 @@ func Uint8Handling(items Uint8Iterator, handlers ...Uint8Handler) Uint8Iterator 
 	if items == nil {
 		return EmptyUint8Iterator
 	}
-	return &HandlingUint8Iterator{preparedUint8Item{base: items}, Uint8HandlerSeries(handlers...)}
+	return &HandlingUint8Iterator{
+		preparedUint8Item{base: items}, Uint8HandlerSeries(handlers...)}
 }
 
-func Uint8Range(items Uint8Iterator, handler ...Uint8Handler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Uint8Discard(Uint8Handling(items, handler...))
-}
-
+// Uint8EnumHandler is an object handling an item type of uint8 and its ordered number.
 type Uint8EnumHandler interface {
+	// Handle should do something with item of uint8 and its ordered number.
 	// It is suggested to return EndOfUint8Iterator to stop iteration.
 	Handle(int, uint8) error
 }
 
+// Uint8EnumHandle is a shortcut implementation
+// of Uint8EnumHandler based on a function.
 type Uint8EnumHandle func(int, uint8) error
 
+// Handle does something with item of uint8 and its ordered number.
+// It is suggested to return EndOfUint8Iterator to stop iteration.
 func (h Uint8EnumHandle) Handle(n int, item uint8) error { return h(n, item) }
 
+// Uint8DoEnumNothing does nothing.
 var Uint8DoEnumNothing = Uint8EnumHandle(func(_ int, _ uint8) error { return nil })
 
 type doubleUint8EnumHandler struct {
@@ -110,6 +126,8 @@ func (h doubleUint8EnumHandler) Handle(n int, item uint8) error {
 	return nil
 }
 
+// Uint8EnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func Uint8EnumHandlerSeries(handlers ...Uint8EnumHandler) Uint8EnumHandler {
 	var series Uint8EnumHandler = Uint8DoEnumNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
@@ -121,12 +139,16 @@ func Uint8EnumHandlerSeries(handlers ...Uint8EnumHandler) Uint8EnumHandler {
 	return series
 }
 
+// EnumHandlingUint8Iterator does iteration with
+// handling by previously set handler.
 type EnumHandlingUint8Iterator struct {
 	preparedUint8Item
 	handler Uint8EnumHandler
 	count   int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumHandlingUint8Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -159,9 +181,4 @@ func Uint8EnumHandling(items Uint8Iterator, handlers ...Uint8EnumHandler) Uint8I
 	}
 	return &EnumHandlingUint8Iterator{
 		preparedUint8Item{base: items}, Uint8EnumHandlerSeries(handlers...), 0}
-}
-
-func Uint8Enumerate(items Uint8Iterator, handler ...Uint8EnumHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Uint8Discard(Uint8EnumHandling(items, handler...))
 }

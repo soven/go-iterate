@@ -3,6 +3,8 @@ package {{ .PackageName }}
 
 import "github.com/pkg/errors"
 
+// EndOf{{ .TitlePrefix }}Iterator is an error to stop iterating over an iterator.
+// It is used in some method of the package.
 var EndOf{{ .TitlePrefix }}Iterator = errors.New("end of {{ .TypeName }} iterator")
 
 func isEndOf{{ .TitlePrefix }}Iterator(err error) bool {
@@ -43,7 +45,8 @@ func (it *prepared{{ .TitlePrefix }}Item) HasNext() bool {
 
 func (it *prepared{{ .TitlePrefix }}Item) Next() {{ .TypeName }} {
 	if !it.hasNext {
-		panicIf{{ .TitlePrefix }}IteratorError(errors.New("no next"), "prepared: next")
+		panicIf{{ .TitlePrefix }}IteratorError(
+			errors.New("no next"), "prepared: next")
 	}
 	next := it.next
 	it.hasNext = false

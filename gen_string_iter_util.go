@@ -3,6 +3,8 @@ package iter
 
 import "github.com/pkg/errors"
 
+// EndOfStringIterator is an error to stop iterating over an iterator.
+// It is used in some method of the package.
 var EndOfStringIterator = errors.New("end of string iterator")
 
 func isEndOfStringIterator(err error) bool {
@@ -43,7 +45,8 @@ func (it *preparedStringItem) HasNext() bool {
 
 func (it *preparedStringItem) Next() string {
 	if !it.hasNext {
-		panicIfStringIteratorError(errors.New("no next"), "prepared: next")
+		panicIfStringIteratorError(
+			errors.New("no next"), "prepared: next")
 	}
 	next := it.next
 	it.hasNext = false

@@ -1,2 +1,2 @@
-//go:generate make pre_gen_all
+//go:generate make gen_kit_all
 package iter

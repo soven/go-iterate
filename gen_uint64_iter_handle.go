@@ -3,16 +3,23 @@ package iter
 
 import "github.com/pkg/errors"
 
+// Uint64Handler is an object handling an item type of uint64.
 type Uint64Handler interface {
+	// Handle should do something with item of uint64.
 	// It is suggested to return EndOfUint64Iterator to stop iteration.
 	Handle(uint64) error
 }
 
+// Uint64Handle is a shortcut implementation
+// of Uint64Handler based on a function.
 type Uint64Handle func(uint64) error
 
+// Handle does something with item of uint64.
+// It is suggested to return EndOfUint64Iterator to stop iteration.
 func (h Uint64Handle) Handle(item uint64) error { return h(item) }
 
-var Uint64DoNothing = Uint64Handle(func(_ uint64) error { return nil })
+// Uint64DoNothing does nothing.
+var Uint64DoNothing Uint64Handler = Uint64Handle(func(_ uint64) error { return nil })
 
 type doubleUint64Handler struct {
 	lhs, rhs Uint64Handler
@@ -30,8 +37,10 @@ func (h doubleUint64Handler) Handle(item uint64) error {
 	return nil
 }
 
+// Uint64HandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func Uint64HandlerSeries(handlers ...Uint64Handler) Uint64Handler {
-	var series Uint64Handler = Uint64DoNothing
+	var series = Uint64DoNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
 		if handlers[i] == nil {
 			continue
@@ -41,11 +50,15 @@ func Uint64HandlerSeries(handlers ...Uint64Handler) Uint64Handler {
 	return series
 }
 
+// HandlingUint64Iterator does iteration with
+// handling by previously set handler.
 type HandlingUint64Iterator struct {
 	preparedUint64Item
 	handler Uint64Handler
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *HandlingUint64Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -75,23 +88,26 @@ func Uint64Handling(items Uint64Iterator, handlers ...Uint64Handler) Uint64Itera
 	if items == nil {
 		return EmptyUint64Iterator
 	}
-	return &HandlingUint64Iterator{preparedUint64Item{base: items}, Uint64HandlerSeries(handlers...)}
+	return &HandlingUint64Iterator{
+		preparedUint64Item{base: items}, Uint64HandlerSeries(handlers...)}
 }
 
-func Uint64Range(items Uint64Iterator, handler ...Uint64Handler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Uint64Discard(Uint64Handling(items, handler...))
-}
-
+// Uint64EnumHandler is an object handling an item type of uint64 and its ordered number.
 type Uint64EnumHandler interface {
+	// Handle should do something with item of uint64 and its ordered number.
 	// It is suggested to return EndOfUint64Iterator to stop iteration.
 	Handle(int, uint64) error
 }
 
+// Uint64EnumHandle is a shortcut implementation
+// of Uint64EnumHandler based on a function.
 type Uint64EnumHandle func(int, uint64) error
 
+// Handle does something with item of uint64 and its ordered number.
+// It is suggested to return EndOfUint64Iterator to stop iteration.
 func (h Uint64EnumHandle) Handle(n int, item uint64) error { return h(n, item) }
 
+// Uint64DoEnumNothing does nothing.
 var Uint64DoEnumNothing = Uint64EnumHandle(func(_ int, _ uint64) error { return nil })
 
 type doubleUint64EnumHandler struct {
@@ -110,6 +126,8 @@ func (h doubleUint64EnumHandler) Handle(n int, item uint64) error {
 	return nil
 }
 
+// Uint64EnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func Uint64EnumHandlerSeries(handlers ...Uint64EnumHandler) Uint64EnumHandler {
 	var series Uint64EnumHandler = Uint64DoEnumNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
@@ -121,12 +139,16 @@ func Uint64EnumHandlerSeries(handlers ...Uint64EnumHandler) Uint64EnumHandler {
 	return series
 }
 
+// EnumHandlingUint64Iterator does iteration with
+// handling by previously set handler.
 type EnumHandlingUint64Iterator struct {
 	preparedUint64Item
 	handler Uint64EnumHandler
 	count   int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumHandlingUint64Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -159,9 +181,4 @@ func Uint64EnumHandling(items Uint64Iterator, handlers ...Uint64EnumHandler) Uin
 	}
 	return &EnumHandlingUint64Iterator{
 		preparedUint64Item{base: items}, Uint64EnumHandlerSeries(handlers...), 0}
-}
-
-func Uint64Enumerate(items Uint64Iterator, handler ...Uint64EnumHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Uint64Discard(Uint64EnumHandling(items, handler...))
 }

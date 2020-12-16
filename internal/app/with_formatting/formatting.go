@@ -7,6 +7,7 @@ import (
 )
 
 type formatter interface {
+	// FormatFile should format file by the given path.
 	FormatFile(filePath string) error
 }
 
@@ -50,6 +51,7 @@ func (f GenIterFormatting) GenerateIter(packagePath string, ctx app.GenerateIter
 	return targetFilePaths, nil
 }
 
+// WithFormatting decorates app.IterGenerator with formatting logic.
 func WithFormatting(decorated app.IterGenerator) GenIterFormatting {
 	return newGenIterFormatting(decorated, goFormatInstance)
 }

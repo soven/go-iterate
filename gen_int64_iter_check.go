@@ -3,20 +3,33 @@ package iter
 
 import "github.com/pkg/errors"
 
+// Int64Checker is an object checking an item type of int64
+// for some condition.
 type Int64Checker interface {
+	// Check should check an item type of int64 for some condition.
 	// It is suggested to return EndOfInt64Iterator to stop iteration.
 	Check(int64) (bool, error)
 }
 
+// Int64Check is a shortcut implementation
+// of Int64Checker based on a function.
 type Int64Check func(int64) (bool, error)
 
+// Check checks an item type of int64 for some condition.
+// It returns EndOfInt64Iterator to stop iteration.
 func (ch Int64Check) Check(item int64) (bool, error) { return ch(item) }
 
 var (
-	AlwaysInt64CheckTrue  = Int64Check(func(item int64) (bool, error) { return true, nil })
-	AlwaysInt64CheckFalse = Int64Check(func(item int64) (bool, error) { return false, nil })
+	// AlwaysInt64CheckTrue always returns true and empty error.
+	AlwaysInt64CheckTrue Int64Checker = Int64Check(
+		func(item int64) (bool, error) { return true, nil })
+	// AlwaysInt64CheckFalse always returns false and empty error.
+	AlwaysInt64CheckFalse Int64Checker = Int64Check(
+		func(item int64) (bool, error) { return false, nil })
 )
 
+// NotInt64 do an inversion for checker result.
+// It is returns AlwaysInt64CheckTrue if checker is nil.
 func NotInt64(checker Int64Checker) Int64Checker {
 	if checker == nil {
 		return AlwaysInt64CheckTrue
@@ -52,8 +65,11 @@ func (a andInt64) Check(item int64) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AllInt64 combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true checker if the list of checkers is empty.
 func AllInt64(checkers ...Int64Checker) Int64Checker {
-	var all Int64Checker = AlwaysInt64CheckTrue
+	var all = AlwaysInt64CheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -83,8 +99,11 @@ func (o orInt64) Check(item int64) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AnyInt64 combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func AnyInt64(checkers ...Int64Checker) Int64Checker {
-	var any Int64Checker = AlwaysInt64CheckFalse
+	var any = AlwaysInt64CheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -94,11 +113,15 @@ func AnyInt64(checkers ...Int64Checker) Int64Checker {
 	return any
 }
 
+// FilteringInt64Iterator does iteration with
+// filtering by previously set checker.
 type FilteringInt64Iterator struct {
 	preparedInt64Item
 	filter Int64Checker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *FilteringInt64Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -135,18 +158,20 @@ func Int64Filtering(items Int64Iterator, filters ...Int64Checker) Int64Iterator 
 	return &FilteringInt64Iterator{preparedInt64Item{base: items}, AllInt64(filters...)}
 }
 
-func Int64Filter(items Int64Iterator, checker ...Int64Checker) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Int64Discard(Int64Filtering(items, checker...))
-}
-
+// Int64EnumChecker is an object checking an item type of int64
+// and its ordering number in for some condition.
 type Int64EnumChecker interface {
+	// Check checks an item type of int64 and its ordering number for some condition.
 	// It is suggested to return EndOfInt64Iterator to stop iteration.
 	Check(int, int64) (bool, error)
 }
 
+// Int64EnumCheck is a shortcut implementation
+// of Int64EnumChecker based on a function.
 type Int64EnumCheck func(int, int64) (bool, error)
 
+// Check checks an item type of int64 and its ordering number for some condition.
+// It returns EndOfInt64Iterator to stop iteration.
 func (ch Int64EnumCheck) Check(n int, item int64) (bool, error) { return ch(n, item) }
 
 type enumFromInt64Checker struct {
@@ -157,15 +182,27 @@ func (ch enumFromInt64Checker) Check(_ int, item int64) (bool, error) {
 	return ch.Int64Checker.Check(item)
 }
 
+// EnumFromInt64Checker adapts checker type of Int64Checker
+// to the interface Int64EnumChecker.
+// If checker is nil it is return based on AlwaysInt64CheckFalse enum checker.
 func EnumFromInt64Checker(checker Int64Checker) Int64EnumChecker {
+	if checker == nil {
+		checker = AlwaysInt64CheckFalse
+	}
 	return &enumFromInt64Checker{checker}
 }
 
 var (
-	AlwaysInt64EnumCheckTrue  = EnumFromInt64Checker(AlwaysInt64CheckTrue)
-	AlwaysInt64EnumCheckFalse = EnumFromInt64Checker(AlwaysInt64CheckFalse)
+	// AlwaysInt64EnumCheckTrue always returns true and empty error.
+	AlwaysInt64EnumCheckTrue Int64EnumChecker = EnumFromInt64Checker(
+		AlwaysInt64CheckTrue)
+	// AlwaysInt64EnumCheckFalse always returns false and empty error.
+	AlwaysInt64EnumCheckFalse Int64EnumChecker = EnumFromInt64Checker(
+		AlwaysInt64CheckFalse)
 )
 
+// EnumNotInt64 do an inversion for checker result.
+// It is returns AlwaysInt64EnumCheckTrue if checker is nil.
 func EnumNotInt64(checker Int64EnumChecker) Int64EnumChecker {
 	if checker == nil {
 		return AlwaysInt64EnumCheckTrue
@@ -201,8 +238,11 @@ func (a enumAndInt64) Check(n int, item int64) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAllInt64 combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true if the list of checkers is empty.
 func EnumAllInt64(checkers ...Int64EnumChecker) Int64EnumChecker {
-	var all Int64EnumChecker = AlwaysInt64EnumCheckTrue
+	var all = AlwaysInt64EnumCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -232,8 +272,11 @@ func (o enumOrInt64) Check(n int, item int64) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAnyInt64 combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func EnumAnyInt64(checkers ...Int64EnumChecker) Int64EnumChecker {
-	var any Int64EnumChecker = AlwaysInt64EnumCheckFalse
+	var any = AlwaysInt64EnumCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -243,12 +286,16 @@ func EnumAnyInt64(checkers ...Int64EnumChecker) Int64EnumChecker {
 	return any
 }
 
+// EnumFilteringInt64Iterator does iteration with
+// filtering by previously set checker.
 type EnumFilteringInt64Iterator struct {
 	preparedInt64Item
 	filter Int64EnumChecker
 	count  int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumFilteringInt64Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -286,11 +333,15 @@ func Int64EnumFiltering(items Int64Iterator, filters ...Int64EnumChecker) Int64I
 	return &EnumFilteringInt64Iterator{preparedInt64Item{base: items}, EnumAllInt64(filters...), 0}
 }
 
+// DoingUntilInt64Iterator does iteration
+// until previously set checker is passed.
 type DoingUntilInt64Iterator struct {
 	preparedInt64Item
 	until Int64Checker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *DoingUntilInt64Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -327,7 +378,8 @@ func Int64DoingUntil(items Int64Iterator, untilList ...Int64Checker) Int64Iterat
 	return &DoingUntilInt64Iterator{preparedInt64Item{base: items}, AllInt64(untilList...)}
 }
 
-func Int64DoUntil(items Int64Iterator, untilList ...Int64Checker) error {
+// Int64SkipUntil sets until conditions to skip few items.
+func Int64SkipUntil(items Int64Iterator, untilList ...Int64Checker) error {
 	// no error wrapping since no additional context for the error; just return it.
 	return Int64Discard(Int64DoingUntil(items, untilList...))
 }

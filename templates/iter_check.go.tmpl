@@ -3,20 +3,33 @@ package {{ .PackageName }}
 
 import "github.com/pkg/errors"
 
+// {{ .TitlePrefix }}Checker is an object checking an item type of {{ .TypeName }}
+// for some condition.
 type {{ .TitlePrefix }}Checker interface {
+	// Check should check an item type of {{ .TypeName }} for some condition.
 	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
 	Check({{ .TypeName }}) (bool, error)
 }
 
+// {{ .TitlePrefix }}Check is a shortcut implementation
+// of {{ .TitlePrefix }}Checker based on a function.
 type {{ .TitlePrefix }}Check func({{ .TypeName }}) (bool, error)
 
+// Check checks an item type of {{ .TypeName }} for some condition.
+// It returns EndOf{{ .TitlePrefix }}Iterator to stop iteration.
 func (ch {{ .TitlePrefix }}Check) Check(item {{ .TypeName }}) (bool, error) { return ch(item) }
 
 var (
-	Always{{ .TitlePrefix }}CheckTrue  = {{ .TitlePrefix }}Check(func(item {{ .TypeName }}) (bool, error) { return true, nil })
-	Always{{ .TitlePrefix }}CheckFalse = {{ .TitlePrefix }}Check(func(item {{ .TypeName }}) (bool, error) { return false, nil })
+	// Always{{ .TitlePrefix }}CheckTrue always returns true and empty error.
+	Always{{ .TitlePrefix }}CheckTrue {{ .TitlePrefix }}Checker = {{ .TitlePrefix }}Check(
+		func(item {{ .TypeName }}) (bool, error) { return true, nil })
+	// Always{{ .TitlePrefix }}CheckFalse always returns false and empty error.
+	Always{{ .TitlePrefix }}CheckFalse {{ .TitlePrefix }}Checker = {{ .TitlePrefix }}Check(
+		func(item {{ .TypeName }}) (bool, error) { return false, nil })
 )
 
+// Not{{ .TitlePrefix }} do an inversion for checker result.
+// It is returns Always{{ .TitlePrefix }}CheckTrue if checker is nil.
 func Not{{ .TitlePrefix }}(checker {{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Checker {
 	if checker == nil {
 		return Always{{ .TitlePrefix }}CheckTrue
@@ -52,8 +65,11 @@ func (a and{{ .TitlePrefix }}) Check(item {{ .TypeName }}) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// All{{ .TitlePrefix }} combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true checker if the list of checkers is empty.
 func All{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Checker {
-	var all {{ .TitlePrefix }}Checker = Always{{ .TitlePrefix }}CheckTrue
+	var all = Always{{ .TitlePrefix }}CheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -83,8 +99,11 @@ func (o or{{ .TitlePrefix }}) Check(item {{ .TypeName }}) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// Any{{ .TitlePrefix }} combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func Any{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Checker {
-	var any {{ .TitlePrefix }}Checker = Always{{ .TitlePrefix }}CheckFalse
+	var any = Always{{ .TitlePrefix }}CheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -94,11 +113,15 @@ func Any{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}Checker) {{ .TitlePrefi
 	return any
 }
 
+// Filtering{{ .TitlePrefix }}Iterator does iteration with
+// filtering by previously set checker.
 type Filtering{{ .TitlePrefix }}Iterator struct {
 	prepared{{ .TitlePrefix }}Item
 	filter {{ .TitlePrefix }}Checker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *Filtering{{ .TitlePrefix }}Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -135,35 +158,51 @@ func {{ .TitlePrefix }}Filtering(items {{ .TitlePrefix }}Iterator, filters ...{{
 	return &Filtering{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, All{{ .TitlePrefix }}(filters...)}
 }
 
-func {{ .TitlePrefix }}Filter(items {{ .TitlePrefix }}Iterator, checker ...{{ .TitlePrefix }}Checker) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}Filtering(items, checker...))
-}
-
+// {{ .TitlePrefix }}EnumChecker is an object checking an item type of {{ .TypeName }}
+// and its ordering number in for some condition.
 type {{ .TitlePrefix }}EnumChecker interface {
+	// Check checks an item type of {{ .TypeName }} and its ordering number for some condition.
 	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
 	Check(int, {{ .TypeName }}) (bool, error)
 }
 
+// {{ .TitlePrefix }}EnumCheck is a shortcut implementation
+// of {{ .TitlePrefix }}EnumChecker based on a function.
 type {{ .TitlePrefix }}EnumCheck func(int, {{ .TypeName }}) (bool, error)
 
+// Check checks an item type of {{ .TypeName }} and its ordering number for some condition.
+// It returns EndOf{{ .TitlePrefix }}Iterator to stop iteration.
 func (ch {{ .TitlePrefix }}EnumCheck) Check(n int, item {{ .TypeName }}) (bool, error) { return ch(n, item) }
 
 type enumFrom{{ .TitlePrefix }}Checker struct {
 	{{ .TitlePrefix }}Checker
 }
 
-func (ch enumFrom{{ .TitlePrefix }}Checker) Check(_ int, item {{ .TypeName }}) (bool, error) { return ch.{{ .TitlePrefix }}Checker.Check(item) }
+func (ch enumFrom{{ .TitlePrefix }}Checker) Check(_ int, item {{ .TypeName }}) (bool, error) {
+	return ch.{{ .TitlePrefix }}Checker.Check(item)
+}
 
+// EnumFrom{{ .TitlePrefix }}Checker adapts checker type of {{ .TitlePrefix }}Checker
+// to the interface {{ .TitlePrefix }}EnumChecker.
+// If checker is nil it is return based on Always{{ .TitlePrefix }}CheckFalse enum checker.
 func EnumFrom{{ .TitlePrefix }}Checker(checker {{ .TitlePrefix }}Checker) {{ .TitlePrefix }}EnumChecker {
+	if checker == nil {
+		checker = Always{{ .TitlePrefix }}CheckFalse
+	}
 	return &enumFrom{{ .TitlePrefix }}Checker{checker}
 }
 
 var (
-	Always{{ .TitlePrefix }}EnumCheckTrue  = EnumFrom{{ .TitlePrefix }}Checker(Always{{ .TitlePrefix }}CheckTrue)
-	Always{{ .TitlePrefix }}EnumCheckFalse = EnumFrom{{ .TitlePrefix }}Checker(Always{{ .TitlePrefix }}CheckFalse)
+	// Always{{ .TitlePrefix }}EnumCheckTrue always returns true and empty error.
+	Always{{ .TitlePrefix }}EnumCheckTrue {{ .TitlePrefix }}EnumChecker = EnumFrom{{ .TitlePrefix }}Checker(
+		Always{{ .TitlePrefix }}CheckTrue)
+	// Always{{ .TitlePrefix }}EnumCheckFalse always returns false and empty error.
+	Always{{ .TitlePrefix }}EnumCheckFalse {{ .TitlePrefix }}EnumChecker = EnumFrom{{ .TitlePrefix }}Checker(
+		Always{{ .TitlePrefix }}CheckFalse)
 )
 
+// EnumNot{{ .TitlePrefix }} do an inversion for checker result.
+// It is returns Always{{ .TitlePrefix }}EnumCheckTrue if checker is nil.
 func EnumNot{{ .TitlePrefix }}(checker {{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}EnumChecker {
 	if checker == nil {
 		return Always{{ .TitlePrefix }}EnumCheckTrue
@@ -199,13 +238,16 @@ func (a enumAnd{{ .TitlePrefix }}) Check(n int, item {{ .TypeName }}) (bool, err
 	return isRHSPassed, nil
 }
 
+// EnumAll{{ .TitlePrefix }} combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true if the list of checkers is empty.
 func EnumAll{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}EnumChecker {
-	var all {{ .TitlePrefix }}EnumChecker = Always{{ .TitlePrefix }}EnumCheckTrue
+	var all = Always{{ .TitlePrefix }}EnumCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
 		}
-		all = enumAnd{{ .TitlePrefix }} {checkers[i], all}
+		all = enumAnd{{ .TitlePrefix }}{checkers[i], all}
 	}
 	return all
 }
@@ -230,8 +272,11 @@ func (o enumOr{{ .TitlePrefix }}) Check(n int, item {{ .TypeName }}) (bool, erro
 	return isRHSPassed, nil
 }
 
+// EnumAny{{ .TitlePrefix }} combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func EnumAny{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}EnumChecker {
-	var any {{ .TitlePrefix }}EnumChecker = Always{{ .TitlePrefix }}EnumCheckFalse
+	var any = Always{{ .TitlePrefix }}EnumCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -241,12 +286,16 @@ func EnumAny{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}EnumChecker) {{ .Ti
 	return any
 }
 
+// EnumFiltering{{ .TitlePrefix }}Iterator does iteration with
+// filtering by previously set checker.
 type EnumFiltering{{ .TitlePrefix }}Iterator struct {
 	prepared{{ .TitlePrefix }}Item
 	filter {{ .TitlePrefix }}EnumChecker
 	count  int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumFiltering{{ .TitlePrefix }}Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -284,11 +333,15 @@ func {{ .TitlePrefix }}EnumFiltering(items {{ .TitlePrefix }}Iterator, filters .
 	return &EnumFiltering{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, EnumAll{{ .TitlePrefix }}(filters...), 0}
 }
 
+// DoingUntil{{ .TitlePrefix }}Iterator does iteration
+// until previously set checker is passed.
 type DoingUntil{{ .TitlePrefix }}Iterator struct {
 	prepared{{ .TitlePrefix }}Item
 	until {{ .TitlePrefix }}Checker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *DoingUntil{{ .TitlePrefix }}Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -325,7 +378,8 @@ func {{ .TitlePrefix }}DoingUntil(items {{ .TitlePrefix }}Iterator, untilList ..
 	return &DoingUntil{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, All{{ .TitlePrefix }}(untilList...)}
 }
 
-func {{ .TitlePrefix }}DoUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}Checker) error {
+// {{ .TitlePrefix }}SkipUntil sets until conditions to skip few items.
+func {{ .TitlePrefix }}SkipUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}Checker) error {
 	// no error wrapping since no additional context for the error; just return it.
 	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}DoingUntil(items, untilList...))
 }

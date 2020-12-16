@@ -30,6 +30,7 @@ func (it *doubleByteIterator) Err() error {
 	return it.rhs.Err()
 }
 
+// SuperByteIterator combines all iterators to one.
 func SuperByteIterator(itemList ...ByteIterator) ByteIterator {
 	var super ByteIterator = EmptyByteIterator
 	for i := len(itemList) - 1; i >= 0; i-- {

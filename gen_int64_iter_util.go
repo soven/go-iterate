@@ -3,6 +3,8 @@ package iter
 
 import "github.com/pkg/errors"
 
+// EndOfInt64Iterator is an error to stop iterating over an iterator.
+// It is used in some method of the package.
 var EndOfInt64Iterator = errors.New("end of int64 iterator")
 
 func isEndOfInt64Iterator(err error) bool {
@@ -43,7 +45,8 @@ func (it *preparedInt64Item) HasNext() bool {
 
 func (it *preparedInt64Item) Next() int64 {
 	if !it.hasNext {
-		panicIfInt64IteratorError(errors.New("no next"), "prepared: next")
+		panicIfInt64IteratorError(
+			errors.New("no next"), "prepared: next")
 	}
 	next := it.next
 	it.hasNext = false

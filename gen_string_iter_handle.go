@@ -3,16 +3,23 @@ package iter
 
 import "github.com/pkg/errors"
 
+// StringHandler is an object handling an item type of string.
 type StringHandler interface {
+	// Handle should do something with item of string.
 	// It is suggested to return EndOfStringIterator to stop iteration.
 	Handle(string) error
 }
 
+// StringHandle is a shortcut implementation
+// of StringHandler based on a function.
 type StringHandle func(string) error
 
+// Handle does something with item of string.
+// It is suggested to return EndOfStringIterator to stop iteration.
 func (h StringHandle) Handle(item string) error { return h(item) }
 
-var StringDoNothing = StringHandle(func(_ string) error { return nil })
+// StringDoNothing does nothing.
+var StringDoNothing StringHandler = StringHandle(func(_ string) error { return nil })
 
 type doubleStringHandler struct {
 	lhs, rhs StringHandler
@@ -30,8 +37,10 @@ func (h doubleStringHandler) Handle(item string) error {
 	return nil
 }
 
+// StringHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func StringHandlerSeries(handlers ...StringHandler) StringHandler {
-	var series StringHandler = StringDoNothing
+	var series = StringDoNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
 		if handlers[i] == nil {
 			continue
@@ -41,11 +50,15 @@ func StringHandlerSeries(handlers ...StringHandler) StringHandler {
 	return series
 }
 
+// HandlingStringIterator does iteration with
+// handling by previously set handler.
 type HandlingStringIterator struct {
 	preparedStringItem
 	handler StringHandler
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *HandlingStringIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -75,23 +88,26 @@ func StringHandling(items StringIterator, handlers ...StringHandler) StringItera
 	if items == nil {
 		return EmptyStringIterator
 	}
-	return &HandlingStringIterator{preparedStringItem{base: items}, StringHandlerSeries(handlers...)}
+	return &HandlingStringIterator{
+		preparedStringItem{base: items}, StringHandlerSeries(handlers...)}
 }
 
-func StringRange(items StringIterator, handler ...StringHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return StringDiscard(StringHandling(items, handler...))
-}
-
+// StringEnumHandler is an object handling an item type of string and its ordered number.
 type StringEnumHandler interface {
+	// Handle should do something with item of string and its ordered number.
 	// It is suggested to return EndOfStringIterator to stop iteration.
 	Handle(int, string) error
 }
 
+// StringEnumHandle is a shortcut implementation
+// of StringEnumHandler based on a function.
 type StringEnumHandle func(int, string) error
 
+// Handle does something with item of string and its ordered number.
+// It is suggested to return EndOfStringIterator to stop iteration.
 func (h StringEnumHandle) Handle(n int, item string) error { return h(n, item) }
 
+// StringDoEnumNothing does nothing.
 var StringDoEnumNothing = StringEnumHandle(func(_ int, _ string) error { return nil })
 
 type doubleStringEnumHandler struct {
@@ -110,6 +126,8 @@ func (h doubleStringEnumHandler) Handle(n int, item string) error {
 	return nil
 }
 
+// StringEnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func StringEnumHandlerSeries(handlers ...StringEnumHandler) StringEnumHandler {
 	var series StringEnumHandler = StringDoEnumNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
@@ -121,12 +139,16 @@ func StringEnumHandlerSeries(handlers ...StringEnumHandler) StringEnumHandler {
 	return series
 }
 
+// EnumHandlingStringIterator does iteration with
+// handling by previously set handler.
 type EnumHandlingStringIterator struct {
 	preparedStringItem
 	handler StringEnumHandler
 	count   int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumHandlingStringIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -159,9 +181,4 @@ func StringEnumHandling(items StringIterator, handlers ...StringEnumHandler) Str
 	}
 	return &EnumHandlingStringIterator{
 		preparedStringItem{base: items}, StringEnumHandlerSeries(handlers...), 0}
-}
-
-func StringEnumerate(items StringIterator, handler ...StringEnumHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return StringDiscard(StringEnumHandling(items, handler...))
 }

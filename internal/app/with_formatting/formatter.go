@@ -12,6 +12,7 @@ import (
 
 type goFormat struct{}
 
+// FormatFile formats file by the given path.
 func (goFormat) FormatFile(filePath string) error {
 	fileBytes, err := ioutil.ReadFile(filePath)
 	if err != nil {

@@ -3,6 +3,8 @@ package iter
 
 import "github.com/pkg/errors"
 
+// EndOfInt8Iterator is an error to stop iterating over an iterator.
+// It is used in some method of the package.
 var EndOfInt8Iterator = errors.New("end of int8 iterator")
 
 func isEndOfInt8Iterator(err error) bool {
@@ -43,7 +45,8 @@ func (it *preparedInt8Item) HasNext() bool {
 
 func (it *preparedInt8Item) Next() int8 {
 	if !it.hasNext {
-		panicIfInt8IteratorError(errors.New("no next"), "prepared: next")
+		panicIfInt8IteratorError(
+			errors.New("no next"), "prepared: next")
 	}
 	next := it.next
 	it.hasNext = false

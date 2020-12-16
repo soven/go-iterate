@@ -3,20 +3,33 @@ package iter
 
 import "github.com/pkg/errors"
 
+// RuneChecker is an object checking an item type of rune
+// for some condition.
 type RuneChecker interface {
+	// Check should check an item type of rune for some condition.
 	// It is suggested to return EndOfRuneIterator to stop iteration.
 	Check(rune) (bool, error)
 }
 
+// RuneCheck is a shortcut implementation
+// of RuneChecker based on a function.
 type RuneCheck func(rune) (bool, error)
 
+// Check checks an item type of rune for some condition.
+// It returns EndOfRuneIterator to stop iteration.
 func (ch RuneCheck) Check(item rune) (bool, error) { return ch(item) }
 
 var (
-	AlwaysRuneCheckTrue  = RuneCheck(func(item rune) (bool, error) { return true, nil })
-	AlwaysRuneCheckFalse = RuneCheck(func(item rune) (bool, error) { return false, nil })
+	// AlwaysRuneCheckTrue always returns true and empty error.
+	AlwaysRuneCheckTrue RuneChecker = RuneCheck(
+		func(item rune) (bool, error) { return true, nil })
+	// AlwaysRuneCheckFalse always returns false and empty error.
+	AlwaysRuneCheckFalse RuneChecker = RuneCheck(
+		func(item rune) (bool, error) { return false, nil })
 )
 
+// NotRune do an inversion for checker result.
+// It is returns AlwaysRuneCheckTrue if checker is nil.
 func NotRune(checker RuneChecker) RuneChecker {
 	if checker == nil {
 		return AlwaysRuneCheckTrue
@@ -52,8 +65,11 @@ func (a andRune) Check(item rune) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AllRune combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true checker if the list of checkers is empty.
 func AllRune(checkers ...RuneChecker) RuneChecker {
-	var all RuneChecker = AlwaysRuneCheckTrue
+	var all = AlwaysRuneCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -83,8 +99,11 @@ func (o orRune) Check(item rune) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AnyRune combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func AnyRune(checkers ...RuneChecker) RuneChecker {
-	var any RuneChecker = AlwaysRuneCheckFalse
+	var any = AlwaysRuneCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -94,11 +113,15 @@ func AnyRune(checkers ...RuneChecker) RuneChecker {
 	return any
 }
 
+// FilteringRuneIterator does iteration with
+// filtering by previously set checker.
 type FilteringRuneIterator struct {
 	preparedRuneItem
 	filter RuneChecker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *FilteringRuneIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -135,18 +158,20 @@ func RuneFiltering(items RuneIterator, filters ...RuneChecker) RuneIterator {
 	return &FilteringRuneIterator{preparedRuneItem{base: items}, AllRune(filters...)}
 }
 
-func RuneFilter(items RuneIterator, checker ...RuneChecker) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return RuneDiscard(RuneFiltering(items, checker...))
-}
-
+// RuneEnumChecker is an object checking an item type of rune
+// and its ordering number in for some condition.
 type RuneEnumChecker interface {
+	// Check checks an item type of rune and its ordering number for some condition.
 	// It is suggested to return EndOfRuneIterator to stop iteration.
 	Check(int, rune) (bool, error)
 }
 
+// RuneEnumCheck is a shortcut implementation
+// of RuneEnumChecker based on a function.
 type RuneEnumCheck func(int, rune) (bool, error)
 
+// Check checks an item type of rune and its ordering number for some condition.
+// It returns EndOfRuneIterator to stop iteration.
 func (ch RuneEnumCheck) Check(n int, item rune) (bool, error) { return ch(n, item) }
 
 type enumFromRuneChecker struct {
@@ -157,15 +182,27 @@ func (ch enumFromRuneChecker) Check(_ int, item rune) (bool, error) {
 	return ch.RuneChecker.Check(item)
 }
 
+// EnumFromRuneChecker adapts checker type of RuneChecker
+// to the interface RuneEnumChecker.
+// If checker is nil it is return based on AlwaysRuneCheckFalse enum checker.
 func EnumFromRuneChecker(checker RuneChecker) RuneEnumChecker {
+	if checker == nil {
+		checker = AlwaysRuneCheckFalse
+	}
 	return &enumFromRuneChecker{checker}
 }
 
 var (
-	AlwaysRuneEnumCheckTrue  = EnumFromRuneChecker(AlwaysRuneCheckTrue)
-	AlwaysRuneEnumCheckFalse = EnumFromRuneChecker(AlwaysRuneCheckFalse)
+	// AlwaysRuneEnumCheckTrue always returns true and empty error.
+	AlwaysRuneEnumCheckTrue RuneEnumChecker = EnumFromRuneChecker(
+		AlwaysRuneCheckTrue)
+	// AlwaysRuneEnumCheckFalse always returns false and empty error.
+	AlwaysRuneEnumCheckFalse RuneEnumChecker = EnumFromRuneChecker(
+		AlwaysRuneCheckFalse)
 )
 
+// EnumNotRune do an inversion for checker result.
+// It is returns AlwaysRuneEnumCheckTrue if checker is nil.
 func EnumNotRune(checker RuneEnumChecker) RuneEnumChecker {
 	if checker == nil {
 		return AlwaysRuneEnumCheckTrue
@@ -201,8 +238,11 @@ func (a enumAndRune) Check(n int, item rune) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAllRune combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true if the list of checkers is empty.
 func EnumAllRune(checkers ...RuneEnumChecker) RuneEnumChecker {
-	var all RuneEnumChecker = AlwaysRuneEnumCheckTrue
+	var all = AlwaysRuneEnumCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -232,8 +272,11 @@ func (o enumOrRune) Check(n int, item rune) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAnyRune combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func EnumAnyRune(checkers ...RuneEnumChecker) RuneEnumChecker {
-	var any RuneEnumChecker = AlwaysRuneEnumCheckFalse
+	var any = AlwaysRuneEnumCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -243,12 +286,16 @@ func EnumAnyRune(checkers ...RuneEnumChecker) RuneEnumChecker {
 	return any
 }
 
+// EnumFilteringRuneIterator does iteration with
+// filtering by previously set checker.
 type EnumFilteringRuneIterator struct {
 	preparedRuneItem
 	filter RuneEnumChecker
 	count  int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumFilteringRuneIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -286,11 +333,15 @@ func RuneEnumFiltering(items RuneIterator, filters ...RuneEnumChecker) RuneItera
 	return &EnumFilteringRuneIterator{preparedRuneItem{base: items}, EnumAllRune(filters...), 0}
 }
 
+// DoingUntilRuneIterator does iteration
+// until previously set checker is passed.
 type DoingUntilRuneIterator struct {
 	preparedRuneItem
 	until RuneChecker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *DoingUntilRuneIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -327,7 +378,8 @@ func RuneDoingUntil(items RuneIterator, untilList ...RuneChecker) RuneIterator {
 	return &DoingUntilRuneIterator{preparedRuneItem{base: items}, AllRune(untilList...)}
 }
 
-func RuneDoUntil(items RuneIterator, untilList ...RuneChecker) error {
+// RuneSkipUntil sets until conditions to skip few items.
+func RuneSkipUntil(items RuneIterator, untilList ...RuneChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
 	return RuneDiscard(RuneDoingUntil(items, untilList...))
 }

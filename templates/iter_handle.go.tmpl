@@ -3,16 +3,23 @@ package {{ .PackageName }}
 
 import "github.com/pkg/errors"
 
+// {{ .TitlePrefix }}Handler is an object handling an item type of {{ .TypeName }}.
 type {{ .TitlePrefix }}Handler interface {
+	// Handle should do something with item of {{ .TypeName }}.
 	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
 	Handle({{ .TypeName }}) error
 }
 
+// {{ .TitlePrefix }}Handle is a shortcut implementation
+// of {{ .TitlePrefix }}Handler based on a function.
 type {{ .TitlePrefix }}Handle func({{ .TypeName }}) error
 
+// Handle does something with item of {{ .TypeName }}.
+// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
 func (h {{ .TitlePrefix }}Handle) Handle(item {{ .TypeName }}) error { return h(item) }
 
-var {{ .TitlePrefix }}DoNothing = {{ .TitlePrefix }}Handle(func(_ {{ .TypeName }}) error { return nil })
+// {{ .TitlePrefix }}DoNothing does nothing.
+var {{ .TitlePrefix }}DoNothing {{ .TitlePrefix }}Handler = {{ .TitlePrefix }}Handle(func(_ {{ .TypeName }}) error { return nil })
 
 type double{{ .TitlePrefix }}Handler struct {
 	lhs, rhs {{ .TitlePrefix }}Handler
@@ -30,8 +37,10 @@ func (h double{{ .TitlePrefix }}Handler) Handle(item {{ .TypeName }}) error {
 	return nil
 }
 
+// {{ .TitlePrefix }}HandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func {{ .TitlePrefix }}HandlerSeries(handlers ...{{ .TitlePrefix }}Handler) {{ .TitlePrefix }}Handler {
-	var series {{ .TitlePrefix }}Handler = {{ .TitlePrefix }}DoNothing
+	var series = {{ .TitlePrefix }}DoNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
 		if handlers[i] == nil {
 			continue
@@ -41,11 +50,15 @@ func {{ .TitlePrefix }}HandlerSeries(handlers ...{{ .TitlePrefix }}Handler) {{ .
 	return series
 }
 
+// Handling{{ .TitlePrefix }}Iterator does iteration with
+// handling by previously set handler.
 type Handling{{ .TitlePrefix }}Iterator struct {
 	prepared{{ .TitlePrefix }}Item
 	handler {{ .TitlePrefix }}Handler
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *Handling{{ .TitlePrefix }}Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -75,23 +88,26 @@ func {{ .TitlePrefix }}Handling(items {{ .TitlePrefix }}Iterator, handlers ...{{
 	if items == nil {
 		return Empty{{ .TitlePrefix }}Iterator
 	}
-	return &Handling{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, {{ .TitlePrefix }}HandlerSeries(handlers...)}
+	return &Handling{{ .TitlePrefix }}Iterator{
+		prepared{{ .TitlePrefix }}Item{base: items}, {{ .TitlePrefix }}HandlerSeries(handlers...)}
 }
 
-func {{ .TitlePrefix }}Range(items {{ .TitlePrefix }}Iterator, handler ...{{ .TitlePrefix }}Handler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}Handling(items, handler...))
-}
-
+// {{ .TitlePrefix }}EnumHandler is an object handling an item type of {{ .TypeName }} and its ordered number.
 type {{ .TitlePrefix }}EnumHandler interface {
+	// Handle should do something with item of {{ .TypeName }} and its ordered number.
 	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
 	Handle(int, {{ .TypeName }}) error
 }
 
+// {{ .TitlePrefix }}EnumHandle is a shortcut implementation
+// of {{ .TitlePrefix }}EnumHandler based on a function.
 type {{ .TitlePrefix }}EnumHandle func(int, {{ .TypeName }}) error
 
+// Handle does something with item of {{ .TypeName }} and its ordered number.
+// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
 func (h {{ .TitlePrefix }}EnumHandle) Handle(n int, item {{ .TypeName }}) error { return h(n, item) }
 
+// {{ .TitlePrefix }}DoEnumNothing does nothing.
 var {{ .TitlePrefix }}DoEnumNothing = {{ .TitlePrefix }}EnumHandle(func(_ int, _ {{ .TypeName }}) error { return nil })
 
 type double{{ .TitlePrefix }}EnumHandler struct {
@@ -110,6 +126,8 @@ func (h double{{ .TitlePrefix }}EnumHandler) Handle(n int, item {{ .TypeName }})
 	return nil
 }
 
+// {{ .TitlePrefix }}EnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func {{ .TitlePrefix }}EnumHandlerSeries(handlers ...{{ .TitlePrefix }}EnumHandler) {{ .TitlePrefix }}EnumHandler {
 	var series {{ .TitlePrefix }}EnumHandler = {{ .TitlePrefix }}DoEnumNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
@@ -121,12 +139,16 @@ func {{ .TitlePrefix }}EnumHandlerSeries(handlers ...{{ .TitlePrefix }}EnumHandl
 	return series
 }
 
+// EnumHandling{{ .TitlePrefix }}Iterator does iteration with
+// handling by previously set handler.
 type EnumHandling{{ .TitlePrefix }}Iterator struct {
 	prepared{{ .TitlePrefix }}Item
 	handler {{ .TitlePrefix }}EnumHandler
 	count   int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumHandling{{ .TitlePrefix }}Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -159,9 +181,4 @@ func {{ .TitlePrefix }}EnumHandling(items {{ .TitlePrefix }}Iterator, handlers .
 	}
 	return &EnumHandling{{ .TitlePrefix }}Iterator{
 		prepared{{ .TitlePrefix }}Item{base: items}, {{ .TitlePrefix }}EnumHandlerSeries(handlers...), 0}
-}
-
-func {{ .TitlePrefix }}Enumerate(items {{ .TitlePrefix }}Iterator, handler ...{{ .TitlePrefix }}EnumHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}EnumHandling(items, handler...))
 }

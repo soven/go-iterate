@@ -1,5 +1,6 @@
 package app
 
+// GenerateIterContext is a context for iter generator.
 type GenerateIterContext struct {
 	// TypeName sets the name of the target type to generate iterator for.
 	TypeName string
@@ -12,15 +13,23 @@ type GenerateIterContext struct {
 	ZeroTypeValue string
 }
 
+// IterGenerator is a use case.
 type IterGenerator interface {
 	// GenerateIter should generate code using path to package and context.
 	GenerateIter(packagePath string, ctx GenerateIterContext) (targetFilePaths []string, err error)
 }
 
+// GenerateIter is a shortcut implementation
+// of IterGenerator based on a function
 type GenerateIter func(packagePath string, ctx GenerateIterContext) (targetFilePaths []string, err error)
 
+// GenerateIter should generate code using path to package and context.
 func (g GenerateIter) GenerateIter(packagePath string, ctx GenerateIterContext) (targetFilePaths []string, err error) {
 	return g(packagePath, ctx)
 }
 
-var NoGenerateIter = GenerateIter(func(_ string, _ GenerateIterContext) ([]string, error) { return nil, nil })
+// NoGenerateIter is a zero value for IterGenerator.
+// It does nothing.
+var NoGenerateIter IterGenerator = GenerateIter(func(_ string, _ GenerateIterContext) ([]string, error) {
+	return nil, nil
+})

@@ -30,6 +30,7 @@ func (it *doubleInt16Iterator) Err() error {
 	return it.rhs.Err()
 }
 
+// SuperInt16Iterator combines all iterators to one.
 func SuperInt16Iterator(itemList ...Int16Iterator) Int16Iterator {
 	var super Int16Iterator = EmptyInt16Iterator
 	for i := len(itemList) - 1; i >= 0; i-- {

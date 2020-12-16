@@ -30,6 +30,7 @@ func (it *doubleInt8Iterator) Err() error {
 	return it.rhs.Err()
 }
 
+// SuperInt8Iterator combines all iterators to one.
 func SuperInt8Iterator(itemList ...Int8Iterator) Int8Iterator {
 	var super Int8Iterator = EmptyInt8Iterator
 	for i := len(itemList) - 1; i >= 0; i-- {

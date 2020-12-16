@@ -3,6 +3,8 @@ package iter
 
 import "github.com/pkg/errors"
 
+// EndOfUint32Iterator is an error to stop iterating over an iterator.
+// It is used in some method of the package.
 var EndOfUint32Iterator = errors.New("end of uint32 iterator")
 
 func isEndOfUint32Iterator(err error) bool {
@@ -43,7 +45,8 @@ func (it *preparedUint32Item) HasNext() bool {
 
 func (it *preparedUint32Item) Next() uint32 {
 	if !it.hasNext {
-		panicIfUint32IteratorError(errors.New("no next"), "prepared: next")
+		panicIfUint32IteratorError(
+			errors.New("no next"), "prepared: next")
 	}
 	next := it.next
 	it.hasNext = false

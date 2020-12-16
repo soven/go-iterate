@@ -3,20 +3,33 @@ package iter
 
 import "github.com/pkg/errors"
 
+// Uint8Checker is an object checking an item type of uint8
+// for some condition.
 type Uint8Checker interface {
+	// Check should check an item type of uint8 for some condition.
 	// It is suggested to return EndOfUint8Iterator to stop iteration.
 	Check(uint8) (bool, error)
 }
 
+// Uint8Check is a shortcut implementation
+// of Uint8Checker based on a function.
 type Uint8Check func(uint8) (bool, error)
 
+// Check checks an item type of uint8 for some condition.
+// It returns EndOfUint8Iterator to stop iteration.
 func (ch Uint8Check) Check(item uint8) (bool, error) { return ch(item) }
 
 var (
-	AlwaysUint8CheckTrue  = Uint8Check(func(item uint8) (bool, error) { return true, nil })
-	AlwaysUint8CheckFalse = Uint8Check(func(item uint8) (bool, error) { return false, nil })
+	// AlwaysUint8CheckTrue always returns true and empty error.
+	AlwaysUint8CheckTrue Uint8Checker = Uint8Check(
+		func(item uint8) (bool, error) { return true, nil })
+	// AlwaysUint8CheckFalse always returns false and empty error.
+	AlwaysUint8CheckFalse Uint8Checker = Uint8Check(
+		func(item uint8) (bool, error) { return false, nil })
 )
 
+// NotUint8 do an inversion for checker result.
+// It is returns AlwaysUint8CheckTrue if checker is nil.
 func NotUint8(checker Uint8Checker) Uint8Checker {
 	if checker == nil {
 		return AlwaysUint8CheckTrue
@@ -52,8 +65,11 @@ func (a andUint8) Check(item uint8) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AllUint8 combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true checker if the list of checkers is empty.
 func AllUint8(checkers ...Uint8Checker) Uint8Checker {
-	var all Uint8Checker = AlwaysUint8CheckTrue
+	var all = AlwaysUint8CheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -83,8 +99,11 @@ func (o orUint8) Check(item uint8) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AnyUint8 combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func AnyUint8(checkers ...Uint8Checker) Uint8Checker {
-	var any Uint8Checker = AlwaysUint8CheckFalse
+	var any = AlwaysUint8CheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -94,11 +113,15 @@ func AnyUint8(checkers ...Uint8Checker) Uint8Checker {
 	return any
 }
 
+// FilteringUint8Iterator does iteration with
+// filtering by previously set checker.
 type FilteringUint8Iterator struct {
 	preparedUint8Item
 	filter Uint8Checker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *FilteringUint8Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -135,18 +158,20 @@ func Uint8Filtering(items Uint8Iterator, filters ...Uint8Checker) Uint8Iterator 
 	return &FilteringUint8Iterator{preparedUint8Item{base: items}, AllUint8(filters...)}
 }
 
-func Uint8Filter(items Uint8Iterator, checker ...Uint8Checker) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Uint8Discard(Uint8Filtering(items, checker...))
-}
-
+// Uint8EnumChecker is an object checking an item type of uint8
+// and its ordering number in for some condition.
 type Uint8EnumChecker interface {
+	// Check checks an item type of uint8 and its ordering number for some condition.
 	// It is suggested to return EndOfUint8Iterator to stop iteration.
 	Check(int, uint8) (bool, error)
 }
 
+// Uint8EnumCheck is a shortcut implementation
+// of Uint8EnumChecker based on a function.
 type Uint8EnumCheck func(int, uint8) (bool, error)
 
+// Check checks an item type of uint8 and its ordering number for some condition.
+// It returns EndOfUint8Iterator to stop iteration.
 func (ch Uint8EnumCheck) Check(n int, item uint8) (bool, error) { return ch(n, item) }
 
 type enumFromUint8Checker struct {
@@ -157,15 +182,27 @@ func (ch enumFromUint8Checker) Check(_ int, item uint8) (bool, error) {
 	return ch.Uint8Checker.Check(item)
 }
 
+// EnumFromUint8Checker adapts checker type of Uint8Checker
+// to the interface Uint8EnumChecker.
+// If checker is nil it is return based on AlwaysUint8CheckFalse enum checker.
 func EnumFromUint8Checker(checker Uint8Checker) Uint8EnumChecker {
+	if checker == nil {
+		checker = AlwaysUint8CheckFalse
+	}
 	return &enumFromUint8Checker{checker}
 }
 
 var (
-	AlwaysUint8EnumCheckTrue  = EnumFromUint8Checker(AlwaysUint8CheckTrue)
-	AlwaysUint8EnumCheckFalse = EnumFromUint8Checker(AlwaysUint8CheckFalse)
+	// AlwaysUint8EnumCheckTrue always returns true and empty error.
+	AlwaysUint8EnumCheckTrue Uint8EnumChecker = EnumFromUint8Checker(
+		AlwaysUint8CheckTrue)
+	// AlwaysUint8EnumCheckFalse always returns false and empty error.
+	AlwaysUint8EnumCheckFalse Uint8EnumChecker = EnumFromUint8Checker(
+		AlwaysUint8CheckFalse)
 )
 
+// EnumNotUint8 do an inversion for checker result.
+// It is returns AlwaysUint8EnumCheckTrue if checker is nil.
 func EnumNotUint8(checker Uint8EnumChecker) Uint8EnumChecker {
 	if checker == nil {
 		return AlwaysUint8EnumCheckTrue
@@ -201,8 +238,11 @@ func (a enumAndUint8) Check(n int, item uint8) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAllUint8 combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true if the list of checkers is empty.
 func EnumAllUint8(checkers ...Uint8EnumChecker) Uint8EnumChecker {
-	var all Uint8EnumChecker = AlwaysUint8EnumCheckTrue
+	var all = AlwaysUint8EnumCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -232,8 +272,11 @@ func (o enumOrUint8) Check(n int, item uint8) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAnyUint8 combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func EnumAnyUint8(checkers ...Uint8EnumChecker) Uint8EnumChecker {
-	var any Uint8EnumChecker = AlwaysUint8EnumCheckFalse
+	var any = AlwaysUint8EnumCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -243,12 +286,16 @@ func EnumAnyUint8(checkers ...Uint8EnumChecker) Uint8EnumChecker {
 	return any
 }
 
+// EnumFilteringUint8Iterator does iteration with
+// filtering by previously set checker.
 type EnumFilteringUint8Iterator struct {
 	preparedUint8Item
 	filter Uint8EnumChecker
 	count  int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumFilteringUint8Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -286,11 +333,15 @@ func Uint8EnumFiltering(items Uint8Iterator, filters ...Uint8EnumChecker) Uint8I
 	return &EnumFilteringUint8Iterator{preparedUint8Item{base: items}, EnumAllUint8(filters...), 0}
 }
 
+// DoingUntilUint8Iterator does iteration
+// until previously set checker is passed.
 type DoingUntilUint8Iterator struct {
 	preparedUint8Item
 	until Uint8Checker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *DoingUntilUint8Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -327,7 +378,8 @@ func Uint8DoingUntil(items Uint8Iterator, untilList ...Uint8Checker) Uint8Iterat
 	return &DoingUntilUint8Iterator{preparedUint8Item{base: items}, AllUint8(untilList...)}
 }
 
-func Uint8DoUntil(items Uint8Iterator, untilList ...Uint8Checker) error {
+// Uint8SkipUntil sets until conditions to skip few items.
+func Uint8SkipUntil(items Uint8Iterator, untilList ...Uint8Checker) error {
 	// no error wrapping since no additional context for the error; just return it.
 	return Uint8Discard(Uint8DoingUntil(items, untilList...))
 }

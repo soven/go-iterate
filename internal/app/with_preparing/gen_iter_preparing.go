@@ -6,34 +6,36 @@ import (
 	"github.com/soven/go-iterate/internal/app"
 )
 
-type preparer interface {
+type genIterPreparer interface {
+	// PreparePackagePath should prepare package path.
 	PreparePackagePath(string) (string, error)
+	// PrepareContext should prepare context.
 	PrepareContext(app.GenerateIterContext) (app.GenerateIterContext, error)
 }
 
-type noPreparer struct{}
+type noGenIterPreparer struct{}
 
-func (noPreparer) PreparePackagePath(v string) (string, error) { return v, nil }
-func (noPreparer) PrepareContext(ctx app.GenerateIterContext) (app.GenerateIterContext, error) {
+func (noGenIterPreparer) PreparePackagePath(v string) (string, error) { return v, nil }
+func (noGenIterPreparer) PrepareContext(ctx app.GenerateIterContext) (app.GenerateIterContext, error) {
 	return ctx, nil
 }
 
-var noPreparerInstance = noPreparer{}
+var noGenIterPreparerInstance = noGenIterPreparer{}
 
 // GenIterValidator is a wrapper over app.IterGenerator which validates input arguments,
 // then calls decorated instance.
 type GenIterPreparing struct {
 	decorated app.IterGenerator
 
-	preparer preparer
+	preparer genIterPreparer
 }
 
-func newGenIterPreparing(decorated app.IterGenerator, preparer preparer) GenIterPreparing {
+func newGenIterPreparing(decorated app.IterGenerator, preparer genIterPreparer) GenIterPreparing {
 	if decorated == nil {
 		decorated = app.NoGenerateIter
 	}
 	if preparer == nil {
-		preparer = noPreparerInstance
+		preparer = noGenIterPreparerInstance
 	}
 	return GenIterPreparing{decorated: decorated, preparer: preparer}
 }
@@ -59,6 +61,7 @@ func (p GenIterPreparing) GenerateIter(packagePath string, ctx app.GenerateIterC
 	return targetFilePaths, nil
 }
 
-func WithBasePreparation(decorated app.IterGenerator) GenIterPreparing {
+// WithBaseGenIterPreparation decorates app.IterGenerator with preparing context logic.
+func WithBaseGenIterPreparation(decorated app.IterGenerator) GenIterPreparing {
 	return newGenIterPreparing(decorated, basePreparerInstance)
 }

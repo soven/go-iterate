@@ -3,16 +3,23 @@ package iter
 
 import "github.com/pkg/errors"
 
+// Int16Handler is an object handling an item type of int16.
 type Int16Handler interface {
+	// Handle should do something with item of int16.
 	// It is suggested to return EndOfInt16Iterator to stop iteration.
 	Handle(int16) error
 }
 
+// Int16Handle is a shortcut implementation
+// of Int16Handler based on a function.
 type Int16Handle func(int16) error
 
+// Handle does something with item of int16.
+// It is suggested to return EndOfInt16Iterator to stop iteration.
 func (h Int16Handle) Handle(item int16) error { return h(item) }
 
-var Int16DoNothing = Int16Handle(func(_ int16) error { return nil })
+// Int16DoNothing does nothing.
+var Int16DoNothing Int16Handler = Int16Handle(func(_ int16) error { return nil })
 
 type doubleInt16Handler struct {
 	lhs, rhs Int16Handler
@@ -30,8 +37,10 @@ func (h doubleInt16Handler) Handle(item int16) error {
 	return nil
 }
 
+// Int16HandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func Int16HandlerSeries(handlers ...Int16Handler) Int16Handler {
-	var series Int16Handler = Int16DoNothing
+	var series = Int16DoNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
 		if handlers[i] == nil {
 			continue
@@ -41,11 +50,15 @@ func Int16HandlerSeries(handlers ...Int16Handler) Int16Handler {
 	return series
 }
 
+// HandlingInt16Iterator does iteration with
+// handling by previously set handler.
 type HandlingInt16Iterator struct {
 	preparedInt16Item
 	handler Int16Handler
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *HandlingInt16Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -75,23 +88,26 @@ func Int16Handling(items Int16Iterator, handlers ...Int16Handler) Int16Iterator 
 	if items == nil {
 		return EmptyInt16Iterator
 	}
-	return &HandlingInt16Iterator{preparedInt16Item{base: items}, Int16HandlerSeries(handlers...)}
+	return &HandlingInt16Iterator{
+		preparedInt16Item{base: items}, Int16HandlerSeries(handlers...)}
 }
 
-func Int16Range(items Int16Iterator, handler ...Int16Handler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Int16Discard(Int16Handling(items, handler...))
-}
-
+// Int16EnumHandler is an object handling an item type of int16 and its ordered number.
 type Int16EnumHandler interface {
+	// Handle should do something with item of int16 and its ordered number.
 	// It is suggested to return EndOfInt16Iterator to stop iteration.
 	Handle(int, int16) error
 }
 
+// Int16EnumHandle is a shortcut implementation
+// of Int16EnumHandler based on a function.
 type Int16EnumHandle func(int, int16) error
 
+// Handle does something with item of int16 and its ordered number.
+// It is suggested to return EndOfInt16Iterator to stop iteration.
 func (h Int16EnumHandle) Handle(n int, item int16) error { return h(n, item) }
 
+// Int16DoEnumNothing does nothing.
 var Int16DoEnumNothing = Int16EnumHandle(func(_ int, _ int16) error { return nil })
 
 type doubleInt16EnumHandler struct {
@@ -110,6 +126,8 @@ func (h doubleInt16EnumHandler) Handle(n int, item int16) error {
 	return nil
 }
 
+// Int16EnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func Int16EnumHandlerSeries(handlers ...Int16EnumHandler) Int16EnumHandler {
 	var series Int16EnumHandler = Int16DoEnumNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
@@ -121,12 +139,16 @@ func Int16EnumHandlerSeries(handlers ...Int16EnumHandler) Int16EnumHandler {
 	return series
 }
 
+// EnumHandlingInt16Iterator does iteration with
+// handling by previously set handler.
 type EnumHandlingInt16Iterator struct {
 	preparedInt16Item
 	handler Int16EnumHandler
 	count   int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumHandlingInt16Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -159,9 +181,4 @@ func Int16EnumHandling(items Int16Iterator, handlers ...Int16EnumHandler) Int16I
 	}
 	return &EnumHandlingInt16Iterator{
 		preparedInt16Item{base: items}, Int16EnumHandlerSeries(handlers...), 0}
-}
-
-func Int16Enumerate(items Int16Iterator, handler ...Int16EnumHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Int16Discard(Int16EnumHandling(items, handler...))
 }

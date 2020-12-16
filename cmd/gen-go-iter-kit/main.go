@@ -33,12 +33,12 @@ func run() error {
 
 	controller := cli.NewIterGenerator(
 		formatting.WithFormatting(
-			preparing.WithBasePreparation(
-				validating.WithBaseValidation(
-					multiple.Multiple(templateGenerators...)))))
+			preparing.WithBaseGenIterPreparation(
+				validating.WithBaseGenIterValidation(
+					multiple.IterGenerators(templateGenerators...)))))
 	err := controller.GenIter()
 	if err != nil {
-		return errors.Wrap(err, "gen iter")
+		return errors.Wrap(err, "controller gen iter")
 	}
 
 	return nil

@@ -5,6 +5,8 @@ import (
 	"github.com/soven/go-iterate/internal/app"
 )
 
+// DoubleGenIter is an implementation of app.IterGenerator
+// for two generators.
 type DoubleGenIter struct {
 	lhs, rhs app.IterGenerator
 }
@@ -34,8 +36,9 @@ func (d DoubleGenIter) GenerateIter(packagePath string, ctx app.GenerateIterCont
 	return append(targetFilePathsLHS, targetFilePathsRHS...), nil
 }
 
-func Multiple(gens ...app.IterGenerator) app.IterGenerator {
-	var res app.IterGenerator = app.NoGenerateIter
+// IterGenerators joins few generators to one.
+func IterGenerators(gens ...app.IterGenerator) app.IterGenerator {
+	var res = app.NoGenerateIter
 	for i := len(gens) - 1; i >= 0; i-- {
 		if gens[i] == nil {
 			continue

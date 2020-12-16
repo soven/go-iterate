@@ -3,16 +3,23 @@ package iter
 
 import "github.com/pkg/errors"
 
+// ByteHandler is an object handling an item type of byte.
 type ByteHandler interface {
+	// Handle should do something with item of byte.
 	// It is suggested to return EndOfByteIterator to stop iteration.
 	Handle(byte) error
 }
 
+// ByteHandle is a shortcut implementation
+// of ByteHandler based on a function.
 type ByteHandle func(byte) error
 
+// Handle does something with item of byte.
+// It is suggested to return EndOfByteIterator to stop iteration.
 func (h ByteHandle) Handle(item byte) error { return h(item) }
 
-var ByteDoNothing = ByteHandle(func(_ byte) error { return nil })
+// ByteDoNothing does nothing.
+var ByteDoNothing ByteHandler = ByteHandle(func(_ byte) error { return nil })
 
 type doubleByteHandler struct {
 	lhs, rhs ByteHandler
@@ -30,8 +37,10 @@ func (h doubleByteHandler) Handle(item byte) error {
 	return nil
 }
 
+// ByteHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func ByteHandlerSeries(handlers ...ByteHandler) ByteHandler {
-	var series ByteHandler = ByteDoNothing
+	var series = ByteDoNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
 		if handlers[i] == nil {
 			continue
@@ -41,11 +50,15 @@ func ByteHandlerSeries(handlers ...ByteHandler) ByteHandler {
 	return series
 }
 
+// HandlingByteIterator does iteration with
+// handling by previously set handler.
 type HandlingByteIterator struct {
 	preparedByteItem
 	handler ByteHandler
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *HandlingByteIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -75,23 +88,26 @@ func ByteHandling(items ByteIterator, handlers ...ByteHandler) ByteIterator {
 	if items == nil {
 		return EmptyByteIterator
 	}
-	return &HandlingByteIterator{preparedByteItem{base: items}, ByteHandlerSeries(handlers...)}
+	return &HandlingByteIterator{
+		preparedByteItem{base: items}, ByteHandlerSeries(handlers...)}
 }
 
-func ByteRange(items ByteIterator, handler ...ByteHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return ByteDiscard(ByteHandling(items, handler...))
-}
-
+// ByteEnumHandler is an object handling an item type of byte and its ordered number.
 type ByteEnumHandler interface {
+	// Handle should do something with item of byte and its ordered number.
 	// It is suggested to return EndOfByteIterator to stop iteration.
 	Handle(int, byte) error
 }
 
+// ByteEnumHandle is a shortcut implementation
+// of ByteEnumHandler based on a function.
 type ByteEnumHandle func(int, byte) error
 
+// Handle does something with item of byte and its ordered number.
+// It is suggested to return EndOfByteIterator to stop iteration.
 func (h ByteEnumHandle) Handle(n int, item byte) error { return h(n, item) }
 
+// ByteDoEnumNothing does nothing.
 var ByteDoEnumNothing = ByteEnumHandle(func(_ int, _ byte) error { return nil })
 
 type doubleByteEnumHandler struct {
@@ -110,6 +126,8 @@ func (h doubleByteEnumHandler) Handle(n int, item byte) error {
 	return nil
 }
 
+// ByteEnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func ByteEnumHandlerSeries(handlers ...ByteEnumHandler) ByteEnumHandler {
 	var series ByteEnumHandler = ByteDoEnumNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
@@ -121,12 +139,16 @@ func ByteEnumHandlerSeries(handlers ...ByteEnumHandler) ByteEnumHandler {
 	return series
 }
 
+// EnumHandlingByteIterator does iteration with
+// handling by previously set handler.
 type EnumHandlingByteIterator struct {
 	preparedByteItem
 	handler ByteEnumHandler
 	count   int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumHandlingByteIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -159,9 +181,4 @@ func ByteEnumHandling(items ByteIterator, handlers ...ByteEnumHandler) ByteItera
 	}
 	return &EnumHandlingByteIterator{
 		preparedByteItem{base: items}, ByteEnumHandlerSeries(handlers...), 0}
-}
-
-func ByteEnumerate(items ByteIterator, handler ...ByteEnumHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return ByteDiscard(ByteEnumHandling(items, handler...))
 }

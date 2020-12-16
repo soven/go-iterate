@@ -30,6 +30,7 @@ func (it *doubleUint64Iterator) Err() error {
 	return it.rhs.Err()
 }
 
+// SuperUint64Iterator combines all iterators to one.
 func SuperUint64Iterator(itemList ...Uint64Iterator) Uint64Iterator {
 	var super Uint64Iterator = EmptyUint64Iterator
 	for i := len(itemList) - 1; i >= 0; i-- {

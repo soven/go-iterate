@@ -3,16 +3,23 @@ package iter
 
 import "github.com/pkg/errors"
 
+// Int32Handler is an object handling an item type of int32.
 type Int32Handler interface {
+	// Handle should do something with item of int32.
 	// It is suggested to return EndOfInt32Iterator to stop iteration.
 	Handle(int32) error
 }
 
+// Int32Handle is a shortcut implementation
+// of Int32Handler based on a function.
 type Int32Handle func(int32) error
 
+// Handle does something with item of int32.
+// It is suggested to return EndOfInt32Iterator to stop iteration.
 func (h Int32Handle) Handle(item int32) error { return h(item) }
 
-var Int32DoNothing = Int32Handle(func(_ int32) error { return nil })
+// Int32DoNothing does nothing.
+var Int32DoNothing Int32Handler = Int32Handle(func(_ int32) error { return nil })
 
 type doubleInt32Handler struct {
 	lhs, rhs Int32Handler
@@ -30,8 +37,10 @@ func (h doubleInt32Handler) Handle(item int32) error {
 	return nil
 }
 
+// Int32HandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func Int32HandlerSeries(handlers ...Int32Handler) Int32Handler {
-	var series Int32Handler = Int32DoNothing
+	var series = Int32DoNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
 		if handlers[i] == nil {
 			continue
@@ -41,11 +50,15 @@ func Int32HandlerSeries(handlers ...Int32Handler) Int32Handler {
 	return series
 }
 
+// HandlingInt32Iterator does iteration with
+// handling by previously set handler.
 type HandlingInt32Iterator struct {
 	preparedInt32Item
 	handler Int32Handler
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *HandlingInt32Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -75,23 +88,26 @@ func Int32Handling(items Int32Iterator, handlers ...Int32Handler) Int32Iterator 
 	if items == nil {
 		return EmptyInt32Iterator
 	}
-	return &HandlingInt32Iterator{preparedInt32Item{base: items}, Int32HandlerSeries(handlers...)}
+	return &HandlingInt32Iterator{
+		preparedInt32Item{base: items}, Int32HandlerSeries(handlers...)}
 }
 
-func Int32Range(items Int32Iterator, handler ...Int32Handler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Int32Discard(Int32Handling(items, handler...))
-}
-
+// Int32EnumHandler is an object handling an item type of int32 and its ordered number.
 type Int32EnumHandler interface {
+	// Handle should do something with item of int32 and its ordered number.
 	// It is suggested to return EndOfInt32Iterator to stop iteration.
 	Handle(int, int32) error
 }
 
+// Int32EnumHandle is a shortcut implementation
+// of Int32EnumHandler based on a function.
 type Int32EnumHandle func(int, int32) error
 
+// Handle does something with item of int32 and its ordered number.
+// It is suggested to return EndOfInt32Iterator to stop iteration.
 func (h Int32EnumHandle) Handle(n int, item int32) error { return h(n, item) }
 
+// Int32DoEnumNothing does nothing.
 var Int32DoEnumNothing = Int32EnumHandle(func(_ int, _ int32) error { return nil })
 
 type doubleInt32EnumHandler struct {
@@ -110,6 +126,8 @@ func (h doubleInt32EnumHandler) Handle(n int, item int32) error {
 	return nil
 }
 
+// Int32EnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func Int32EnumHandlerSeries(handlers ...Int32EnumHandler) Int32EnumHandler {
 	var series Int32EnumHandler = Int32DoEnumNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
@@ -121,12 +139,16 @@ func Int32EnumHandlerSeries(handlers ...Int32EnumHandler) Int32EnumHandler {
 	return series
 }
 
+// EnumHandlingInt32Iterator does iteration with
+// handling by previously set handler.
 type EnumHandlingInt32Iterator struct {
 	preparedInt32Item
 	handler Int32EnumHandler
 	count   int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumHandlingInt32Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -159,9 +181,4 @@ func Int32EnumHandling(items Int32Iterator, handlers ...Int32EnumHandler) Int32I
 	}
 	return &EnumHandlingInt32Iterator{
 		preparedInt32Item{base: items}, Int32EnumHandlerSeries(handlers...), 0}
-}
-
-func Int32Enumerate(items Int32Iterator, handler ...Int32EnumHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Int32Discard(Int32EnumHandling(items, handler...))
 }

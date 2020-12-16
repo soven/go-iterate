@@ -5,39 +5,41 @@ import (
 	"github.com/soven/go-iterate/internal/app"
 )
 
-type validator interface {
+type genIterValidator interface {
+	// ValidatePackagePath should do package path validation.
 	ValidatePackagePath(string) error
+	// ValidateContext does context validation.
 	ValidateContext(app.GenerateIterContext) error
 }
 
-type alwaysErrValidator struct{}
+type alwaysErrGenIterValidator struct{}
 
-func (alwaysErrValidator) ValidatePackagePath(_ string) error { return errors.New("error") }
-func (alwaysErrValidator) ValidateContext(_ app.GenerateIterContext) error {
+func (alwaysErrGenIterValidator) ValidatePackagePath(_ string) error { return errors.New("error") }
+func (alwaysErrGenIterValidator) ValidateContext(_ app.GenerateIterContext) error {
 	return errors.New("error")
 }
 
-var alwaysErrValidatorInstance = alwaysErrValidator{}
+var alwaysErrGenIterValidatorInstance = alwaysErrGenIterValidator{}
 
 // GenIterValidator is a wrapper over app.IterGenerator which validates input arguments,
 // then calls decorated instance.
 type GenIterValidator struct {
 	decorated app.IterGenerator
 
-	validator validator
+	validator genIterValidator
 }
 
-func newGenIterValidator(decorated app.IterGenerator, validator validator) GenIterValidator {
+func newGenIterValidator(decorated app.IterGenerator, validator genIterValidator) GenIterValidator {
 	if decorated == nil {
 		decorated = app.NoGenerateIter
 	}
 	if validator == nil {
-		validator = alwaysErrValidatorInstance
+		validator = alwaysErrGenIterValidatorInstance
 	}
 	return GenIterValidator{decorated: decorated, validator: validator}
 }
 
-// GenerateIter should generate code using path to package and context.
+// GenerateIter generates code using path to package and context.
 func (v GenIterValidator) GenerateIter(packagePath string, ctx app.GenerateIterContext) ([]string, error) {
 	err := v.validator.ValidatePackagePath(packagePath)
 	if err != nil {
@@ -53,6 +55,7 @@ func (v GenIterValidator) GenerateIter(packagePath string, ctx app.GenerateIterC
 	return v.decorated.GenerateIter(packagePath, ctx)
 }
 
-func WithBaseValidation(decorated app.IterGenerator) GenIterValidator {
-	return newGenIterValidator(decorated, baseValidator{basic: basicInstance})
+// WithBaseGenIterValidation decorates app.IterGenerator with validation logic.
+func WithBaseGenIterValidation(decorated app.IterGenerator) GenIterValidator {
+	return newGenIterValidator(decorated, basicGenIterValidatorInstance)
 }

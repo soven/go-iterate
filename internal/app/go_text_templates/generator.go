@@ -22,7 +22,7 @@ func (f fetchTemplate) FetchTemplate(templatePath string) (t *template.Template,
 	return f(templatePath)
 }
 
-var noFetchTemplate = fetchTemplate(func(_ string) (*template.Template, error) {
+var noFetchTemplate templateFetcher = fetchTemplate(func(_ string) (*template.Template, error) {
 	return nil, errors.New("no fetch template")
 })
 
@@ -37,7 +37,7 @@ func (m makeFileName) MakeFileName(templatePath string, ctx app.GenerateIterCont
 	return m(templatePath, ctx, t)
 }
 
-var makeAlwaysNameIsTarget = makeFileName(func(_ string, _ app.GenerateIterContext, _ *template.Template,
+var makeAlwaysNameIsTarget fileNameMaker = makeFileName(func(_ string, _ app.GenerateIterContext, _ *template.Template,
 ) (string, error) {
 	const alwaysName = "target.go"
 	return alwaysName, nil
@@ -67,7 +67,7 @@ func makeAsIsGenerator(templateFilePath string, fetcher templateFetcher, filePat
 	}
 }
 
-// GenerateIter should generate code using path to package and context.
+// GenerateIter generates code using path to package and context.
 func (g *AsIsGenerator) GenerateIter(packagePath string, ctx app.GenerateIterContext) ([]string, error) {
 	g.fetchTemplate()
 	if g.fetchErr != nil {
@@ -79,10 +79,13 @@ func (g *AsIsGenerator) GenerateIter(packagePath string, ctx app.GenerateIterCon
 	}
 
 	targetFileName, err := g.fileNameMaker.MakeFileName(g.templateFilePath, ctx, g.t)
+	if err != nil {
+		return nil, errors.Wrap(err, "make file name")
+	}
 	targetFilePath := filepath.Join(packagePath, targetFileName)
 	fh, err := os.OpenFile(targetFilePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0664)
 	if err != nil {
-		return nil, fmt.Errorf("open file %s: %w", targetFilePath, err)
+		return nil, fmt.Errorf("open file %s: %w\n", targetFilePath, err)
 	}
 	defer func() {
 		// ignore error since that is not relevant.
@@ -103,7 +106,8 @@ func (g *AsIsGenerator) fetchTemplate() {
 	})
 }
 
+// MakeAsIsGenerator returns an instance of AsIsGenerator ref.
 func MakeAsIsGenerator(templateFilePath string) *AsIsGenerator {
 	return makeAsIsGenerator(templateFilePath, parseFileFetcher,
-		prefixedWithGen(prefixedWithTypeTitle(templateExtTrimmedInstance)))
+		prefixedWithGen(prefixedWithTypeTitle(templateExtTrimmingInstance)))
 }

@@ -3,20 +3,33 @@ package iter
 
 import "github.com/pkg/errors"
 
+// ByteChecker is an object checking an item type of byte
+// for some condition.
 type ByteChecker interface {
+	// Check should check an item type of byte for some condition.
 	// It is suggested to return EndOfByteIterator to stop iteration.
 	Check(byte) (bool, error)
 }
 
+// ByteCheck is a shortcut implementation
+// of ByteChecker based on a function.
 type ByteCheck func(byte) (bool, error)
 
+// Check checks an item type of byte for some condition.
+// It returns EndOfByteIterator to stop iteration.
 func (ch ByteCheck) Check(item byte) (bool, error) { return ch(item) }
 
 var (
-	AlwaysByteCheckTrue  = ByteCheck(func(item byte) (bool, error) { return true, nil })
-	AlwaysByteCheckFalse = ByteCheck(func(item byte) (bool, error) { return false, nil })
+	// AlwaysByteCheckTrue always returns true and empty error.
+	AlwaysByteCheckTrue ByteChecker = ByteCheck(
+		func(item byte) (bool, error) { return true, nil })
+	// AlwaysByteCheckFalse always returns false and empty error.
+	AlwaysByteCheckFalse ByteChecker = ByteCheck(
+		func(item byte) (bool, error) { return false, nil })
 )
 
+// NotByte do an inversion for checker result.
+// It is returns AlwaysByteCheckTrue if checker is nil.
 func NotByte(checker ByteChecker) ByteChecker {
 	if checker == nil {
 		return AlwaysByteCheckTrue
@@ -52,8 +65,11 @@ func (a andByte) Check(item byte) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AllByte combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true checker if the list of checkers is empty.
 func AllByte(checkers ...ByteChecker) ByteChecker {
-	var all ByteChecker = AlwaysByteCheckTrue
+	var all = AlwaysByteCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -83,8 +99,11 @@ func (o orByte) Check(item byte) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AnyByte combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func AnyByte(checkers ...ByteChecker) ByteChecker {
-	var any ByteChecker = AlwaysByteCheckFalse
+	var any = AlwaysByteCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -94,11 +113,15 @@ func AnyByte(checkers ...ByteChecker) ByteChecker {
 	return any
 }
 
+// FilteringByteIterator does iteration with
+// filtering by previously set checker.
 type FilteringByteIterator struct {
 	preparedByteItem
 	filter ByteChecker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *FilteringByteIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -135,18 +158,20 @@ func ByteFiltering(items ByteIterator, filters ...ByteChecker) ByteIterator {
 	return &FilteringByteIterator{preparedByteItem{base: items}, AllByte(filters...)}
 }
 
-func ByteFilter(items ByteIterator, checker ...ByteChecker) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return ByteDiscard(ByteFiltering(items, checker...))
-}
-
+// ByteEnumChecker is an object checking an item type of byte
+// and its ordering number in for some condition.
 type ByteEnumChecker interface {
+	// Check checks an item type of byte and its ordering number for some condition.
 	// It is suggested to return EndOfByteIterator to stop iteration.
 	Check(int, byte) (bool, error)
 }
 
+// ByteEnumCheck is a shortcut implementation
+// of ByteEnumChecker based on a function.
 type ByteEnumCheck func(int, byte) (bool, error)
 
+// Check checks an item type of byte and its ordering number for some condition.
+// It returns EndOfByteIterator to stop iteration.
 func (ch ByteEnumCheck) Check(n int, item byte) (bool, error) { return ch(n, item) }
 
 type enumFromByteChecker struct {
@@ -157,15 +182,27 @@ func (ch enumFromByteChecker) Check(_ int, item byte) (bool, error) {
 	return ch.ByteChecker.Check(item)
 }
 
+// EnumFromByteChecker adapts checker type of ByteChecker
+// to the interface ByteEnumChecker.
+// If checker is nil it is return based on AlwaysByteCheckFalse enum checker.
 func EnumFromByteChecker(checker ByteChecker) ByteEnumChecker {
+	if checker == nil {
+		checker = AlwaysByteCheckFalse
+	}
 	return &enumFromByteChecker{checker}
 }
 
 var (
-	AlwaysByteEnumCheckTrue  = EnumFromByteChecker(AlwaysByteCheckTrue)
-	AlwaysByteEnumCheckFalse = EnumFromByteChecker(AlwaysByteCheckFalse)
+	// AlwaysByteEnumCheckTrue always returns true and empty error.
+	AlwaysByteEnumCheckTrue ByteEnumChecker = EnumFromByteChecker(
+		AlwaysByteCheckTrue)
+	// AlwaysByteEnumCheckFalse always returns false and empty error.
+	AlwaysByteEnumCheckFalse ByteEnumChecker = EnumFromByteChecker(
+		AlwaysByteCheckFalse)
 )
 
+// EnumNotByte do an inversion for checker result.
+// It is returns AlwaysByteEnumCheckTrue if checker is nil.
 func EnumNotByte(checker ByteEnumChecker) ByteEnumChecker {
 	if checker == nil {
 		return AlwaysByteEnumCheckTrue
@@ -201,8 +238,11 @@ func (a enumAndByte) Check(n int, item byte) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAllByte combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true if the list of checkers is empty.
 func EnumAllByte(checkers ...ByteEnumChecker) ByteEnumChecker {
-	var all ByteEnumChecker = AlwaysByteEnumCheckTrue
+	var all = AlwaysByteEnumCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -232,8 +272,11 @@ func (o enumOrByte) Check(n int, item byte) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAnyByte combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func EnumAnyByte(checkers ...ByteEnumChecker) ByteEnumChecker {
-	var any ByteEnumChecker = AlwaysByteEnumCheckFalse
+	var any = AlwaysByteEnumCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -243,12 +286,16 @@ func EnumAnyByte(checkers ...ByteEnumChecker) ByteEnumChecker {
 	return any
 }
 
+// EnumFilteringByteIterator does iteration with
+// filtering by previously set checker.
 type EnumFilteringByteIterator struct {
 	preparedByteItem
 	filter ByteEnumChecker
 	count  int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumFilteringByteIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -286,11 +333,15 @@ func ByteEnumFiltering(items ByteIterator, filters ...ByteEnumChecker) ByteItera
 	return &EnumFilteringByteIterator{preparedByteItem{base: items}, EnumAllByte(filters...), 0}
 }
 
+// DoingUntilByteIterator does iteration
+// until previously set checker is passed.
 type DoingUntilByteIterator struct {
 	preparedByteItem
 	until ByteChecker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *DoingUntilByteIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -327,7 +378,8 @@ func ByteDoingUntil(items ByteIterator, untilList ...ByteChecker) ByteIterator {
 	return &DoingUntilByteIterator{preparedByteItem{base: items}, AllByte(untilList...)}
 }
 
-func ByteDoUntil(items ByteIterator, untilList ...ByteChecker) error {
+// ByteSkipUntil sets until conditions to skip few items.
+func ByteSkipUntil(items ByteIterator, untilList ...ByteChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
 	return ByteDiscard(ByteDoingUntil(items, untilList...))
 }

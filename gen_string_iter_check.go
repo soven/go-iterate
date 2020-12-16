@@ -3,20 +3,33 @@ package iter
 
 import "github.com/pkg/errors"
 
+// StringChecker is an object checking an item type of string
+// for some condition.
 type StringChecker interface {
+	// Check should check an item type of string for some condition.
 	// It is suggested to return EndOfStringIterator to stop iteration.
 	Check(string) (bool, error)
 }
 
+// StringCheck is a shortcut implementation
+// of StringChecker based on a function.
 type StringCheck func(string) (bool, error)
 
+// Check checks an item type of string for some condition.
+// It returns EndOfStringIterator to stop iteration.
 func (ch StringCheck) Check(item string) (bool, error) { return ch(item) }
 
 var (
-	AlwaysStringCheckTrue  = StringCheck(func(item string) (bool, error) { return true, nil })
-	AlwaysStringCheckFalse = StringCheck(func(item string) (bool, error) { return false, nil })
+	// AlwaysStringCheckTrue always returns true and empty error.
+	AlwaysStringCheckTrue StringChecker = StringCheck(
+		func(item string) (bool, error) { return true, nil })
+	// AlwaysStringCheckFalse always returns false and empty error.
+	AlwaysStringCheckFalse StringChecker = StringCheck(
+		func(item string) (bool, error) { return false, nil })
 )
 
+// NotString do an inversion for checker result.
+// It is returns AlwaysStringCheckTrue if checker is nil.
 func NotString(checker StringChecker) StringChecker {
 	if checker == nil {
 		return AlwaysStringCheckTrue
@@ -52,8 +65,11 @@ func (a andString) Check(item string) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AllString combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true checker if the list of checkers is empty.
 func AllString(checkers ...StringChecker) StringChecker {
-	var all StringChecker = AlwaysStringCheckTrue
+	var all = AlwaysStringCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -83,8 +99,11 @@ func (o orString) Check(item string) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AnyString combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func AnyString(checkers ...StringChecker) StringChecker {
-	var any StringChecker = AlwaysStringCheckFalse
+	var any = AlwaysStringCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -94,11 +113,15 @@ func AnyString(checkers ...StringChecker) StringChecker {
 	return any
 }
 
+// FilteringStringIterator does iteration with
+// filtering by previously set checker.
 type FilteringStringIterator struct {
 	preparedStringItem
 	filter StringChecker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *FilteringStringIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -135,18 +158,20 @@ func StringFiltering(items StringIterator, filters ...StringChecker) StringItera
 	return &FilteringStringIterator{preparedStringItem{base: items}, AllString(filters...)}
 }
 
-func StringFilter(items StringIterator, checker ...StringChecker) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return StringDiscard(StringFiltering(items, checker...))
-}
-
+// StringEnumChecker is an object checking an item type of string
+// and its ordering number in for some condition.
 type StringEnumChecker interface {
+	// Check checks an item type of string and its ordering number for some condition.
 	// It is suggested to return EndOfStringIterator to stop iteration.
 	Check(int, string) (bool, error)
 }
 
+// StringEnumCheck is a shortcut implementation
+// of StringEnumChecker based on a function.
 type StringEnumCheck func(int, string) (bool, error)
 
+// Check checks an item type of string and its ordering number for some condition.
+// It returns EndOfStringIterator to stop iteration.
 func (ch StringEnumCheck) Check(n int, item string) (bool, error) { return ch(n, item) }
 
 type enumFromStringChecker struct {
@@ -157,15 +182,27 @@ func (ch enumFromStringChecker) Check(_ int, item string) (bool, error) {
 	return ch.StringChecker.Check(item)
 }
 
+// EnumFromStringChecker adapts checker type of StringChecker
+// to the interface StringEnumChecker.
+// If checker is nil it is return based on AlwaysStringCheckFalse enum checker.
 func EnumFromStringChecker(checker StringChecker) StringEnumChecker {
+	if checker == nil {
+		checker = AlwaysStringCheckFalse
+	}
 	return &enumFromStringChecker{checker}
 }
 
 var (
-	AlwaysStringEnumCheckTrue  = EnumFromStringChecker(AlwaysStringCheckTrue)
-	AlwaysStringEnumCheckFalse = EnumFromStringChecker(AlwaysStringCheckFalse)
+	// AlwaysStringEnumCheckTrue always returns true and empty error.
+	AlwaysStringEnumCheckTrue StringEnumChecker = EnumFromStringChecker(
+		AlwaysStringCheckTrue)
+	// AlwaysStringEnumCheckFalse always returns false and empty error.
+	AlwaysStringEnumCheckFalse StringEnumChecker = EnumFromStringChecker(
+		AlwaysStringCheckFalse)
 )
 
+// EnumNotString do an inversion for checker result.
+// It is returns AlwaysStringEnumCheckTrue if checker is nil.
 func EnumNotString(checker StringEnumChecker) StringEnumChecker {
 	if checker == nil {
 		return AlwaysStringEnumCheckTrue
@@ -201,8 +238,11 @@ func (a enumAndString) Check(n int, item string) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAllString combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true if the list of checkers is empty.
 func EnumAllString(checkers ...StringEnumChecker) StringEnumChecker {
-	var all StringEnumChecker = AlwaysStringEnumCheckTrue
+	var all = AlwaysStringEnumCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -232,8 +272,11 @@ func (o enumOrString) Check(n int, item string) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAnyString combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func EnumAnyString(checkers ...StringEnumChecker) StringEnumChecker {
-	var any StringEnumChecker = AlwaysStringEnumCheckFalse
+	var any = AlwaysStringEnumCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -243,12 +286,16 @@ func EnumAnyString(checkers ...StringEnumChecker) StringEnumChecker {
 	return any
 }
 
+// EnumFilteringStringIterator does iteration with
+// filtering by previously set checker.
 type EnumFilteringStringIterator struct {
 	preparedStringItem
 	filter StringEnumChecker
 	count  int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumFilteringStringIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -286,11 +333,15 @@ func StringEnumFiltering(items StringIterator, filters ...StringEnumChecker) Str
 	return &EnumFilteringStringIterator{preparedStringItem{base: items}, EnumAllString(filters...), 0}
 }
 
+// DoingUntilStringIterator does iteration
+// until previously set checker is passed.
 type DoingUntilStringIterator struct {
 	preparedStringItem
 	until StringChecker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *DoingUntilStringIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -327,7 +378,8 @@ func StringDoingUntil(items StringIterator, untilList ...StringChecker) StringIt
 	return &DoingUntilStringIterator{preparedStringItem{base: items}, AllString(untilList...)}
 }
 
-func StringDoUntil(items StringIterator, untilList ...StringChecker) error {
+// StringSkipUntil sets until conditions to skip few items.
+func StringSkipUntil(items StringIterator, untilList ...StringChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
 	return StringDiscard(StringDoingUntil(items, untilList...))
 }

@@ -5,11 +5,12 @@ import (
 	"github.com/soven/go-iterate/internal/app"
 )
 
-type baseValidator struct {
+type baseGenIterValidator struct {
 	basic basic
 }
 
-func (v baseValidator) ValidatePackagePath(path string) error {
+// ValidatePackagePath does package path validation.
+func (v baseGenIterValidator) ValidatePackagePath(path string) error {
 	err := v.basic.errIfEmptyStr(path)
 	if err != nil {
 		// no wrapping since no additional context
@@ -19,7 +20,8 @@ func (v baseValidator) ValidatePackagePath(path string) error {
 	return v.basic.errIfFileError(path)
 }
 
-func (v baseValidator) ValidateContext(ctx app.GenerateIterContext) error {
+// ValidateContext does context validation.
+func (v baseGenIterValidator) ValidateContext(ctx app.GenerateIterContext) error {
 	err := v.validateType(ctx.TypeName)
 	if err != nil {
 		return errors.Wrap(err, "type name")
@@ -43,24 +45,24 @@ func (v baseValidator) ValidateContext(ctx app.GenerateIterContext) error {
 	return nil
 }
 
-func (v baseValidator) validateType(typ string) error {
+func (v baseGenIterValidator) validateType(typ string) error {
 	// no wrapping since no additional context
 	return v.basic.errIfEmptyStr(typ)
 }
 
-func (v baseValidator) validatePackageName(pkg string) error {
+func (v baseGenIterValidator) validatePackageName(pkg string) error {
 	// no wrapping since no additional context
 	return v.basic.errIfEmptyStr(pkg)
 }
 
-func (v baseValidator) validateTitlePrefix(_ string) error {
+func (v baseGenIterValidator) validateTitlePrefix(_ string) error {
 	// no validation yet
 	return nil
 }
 
-func (v baseValidator) validateZeroTypeValue(zero string) error {
+func (v baseGenIterValidator) validateZeroTypeValue(zero string) error {
 	// no wrapping since no additional context
 	return v.basic.errIfEmptyStr(zero)
 }
 
-var basicValidatorInstance = baseValidator{}
+var basicGenIterValidatorInstance = baseGenIterValidator{basic: basicInstance}

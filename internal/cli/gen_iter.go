@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strings"
@@ -22,7 +23,7 @@ func NewIterGenerator(gen app.IterGenerator) IterGenerator {
 }
 
 func (c IterGenerator) GenIter() error {
-	path, ctx := parseFlags()
+	path, ctx := parseGenIterFlags()
 	generatedFiles, err := c.app.GenerateIter(path, ctx)
 	if err != nil {
 		// no wrapping since no additional context.
@@ -34,9 +35,21 @@ func (c IterGenerator) GenIter() error {
 		}
 	}
 
-	_, errWrite := fmt.Fprintf(os.Stdout, "generated:\n%s\n", strings.Join(generatedFiles, "\n"))
-	if errWrite != nil {
-		return errors.Wrap(errWrite, fmt.Sprintf("write result %+v to stdout", generatedFiles))
+	if len(generatedFiles) > 0 {
+		_, errWrite := fmt.Fprintf(os.Stdout, "generated:\n%s\n", strings.Join(generatedFiles, "\n"))
+		if errWrite != nil {
+			return errors.Wrap(errWrite, fmt.Sprintf("write result %+v to stdout", generatedFiles))
+		}
 	}
 	return nil
+}
+
+func parseGenIterFlags() (packagePath string, ctx app.GenerateIterContext) {
+	flag.StringVar(&ctx.TypeName, "target", "", "Name of target type (required)")
+	flag.StringVar(&ctx.PackageName, "package", "", "Name of package (required)")
+	flag.StringVar(&packagePath, "path", "", "Path to the package (required)")
+	flag.StringVar(&ctx.ZeroTypeValue, "zero", "", "Zero value of target type (required)")
+	flag.StringVar(&ctx.TitlePrefix, "prefix", "", "Prefix of type title (optional)")
+	flag.Parse()
+	return packagePath, ctx
 }

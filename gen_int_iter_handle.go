@@ -3,16 +3,23 @@ package iter
 
 import "github.com/pkg/errors"
 
+// IntHandler is an object handling an item type of int.
 type IntHandler interface {
+	// Handle should do something with item of int.
 	// It is suggested to return EndOfIntIterator to stop iteration.
 	Handle(int) error
 }
 
+// IntHandle is a shortcut implementation
+// of IntHandler based on a function.
 type IntHandle func(int) error
 
+// Handle does something with item of int.
+// It is suggested to return EndOfIntIterator to stop iteration.
 func (h IntHandle) Handle(item int) error { return h(item) }
 
-var IntDoNothing = IntHandle(func(_ int) error { return nil })
+// IntDoNothing does nothing.
+var IntDoNothing IntHandler = IntHandle(func(_ int) error { return nil })
 
 type doubleIntHandler struct {
 	lhs, rhs IntHandler
@@ -30,8 +37,10 @@ func (h doubleIntHandler) Handle(item int) error {
 	return nil
 }
 
+// IntHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func IntHandlerSeries(handlers ...IntHandler) IntHandler {
-	var series IntHandler = IntDoNothing
+	var series = IntDoNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
 		if handlers[i] == nil {
 			continue
@@ -41,11 +50,15 @@ func IntHandlerSeries(handlers ...IntHandler) IntHandler {
 	return series
 }
 
+// HandlingIntIterator does iteration with
+// handling by previously set handler.
 type HandlingIntIterator struct {
 	preparedIntItem
 	handler IntHandler
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *HandlingIntIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -75,23 +88,26 @@ func IntHandling(items IntIterator, handlers ...IntHandler) IntIterator {
 	if items == nil {
 		return EmptyIntIterator
 	}
-	return &HandlingIntIterator{preparedIntItem{base: items}, IntHandlerSeries(handlers...)}
+	return &HandlingIntIterator{
+		preparedIntItem{base: items}, IntHandlerSeries(handlers...)}
 }
 
-func IntRange(items IntIterator, handler ...IntHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return IntDiscard(IntHandling(items, handler...))
-}
-
+// IntEnumHandler is an object handling an item type of int and its ordered number.
 type IntEnumHandler interface {
+	// Handle should do something with item of int and its ordered number.
 	// It is suggested to return EndOfIntIterator to stop iteration.
 	Handle(int, int) error
 }
 
+// IntEnumHandle is a shortcut implementation
+// of IntEnumHandler based on a function.
 type IntEnumHandle func(int, int) error
 
+// Handle does something with item of int and its ordered number.
+// It is suggested to return EndOfIntIterator to stop iteration.
 func (h IntEnumHandle) Handle(n int, item int) error { return h(n, item) }
 
+// IntDoEnumNothing does nothing.
 var IntDoEnumNothing = IntEnumHandle(func(_ int, _ int) error { return nil })
 
 type doubleIntEnumHandler struct {
@@ -110,6 +126,8 @@ func (h doubleIntEnumHandler) Handle(n int, item int) error {
 	return nil
 }
 
+// IntEnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
 func IntEnumHandlerSeries(handlers ...IntEnumHandler) IntEnumHandler {
 	var series IntEnumHandler = IntDoEnumNothing
 	for i := len(handlers) - 1; i >= 0; i-- {
@@ -121,12 +139,16 @@ func IntEnumHandlerSeries(handlers ...IntEnumHandler) IntEnumHandler {
 	return series
 }
 
+// EnumHandlingIntIterator does iteration with
+// handling by previously set handler.
 type EnumHandlingIntIterator struct {
 	preparedIntItem
 	handler IntEnumHandler
 	count   int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumHandlingIntIterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -159,9 +181,4 @@ func IntEnumHandling(items IntIterator, handlers ...IntEnumHandler) IntIterator 
 	}
 	return &EnumHandlingIntIterator{
 		preparedIntItem{base: items}, IntEnumHandlerSeries(handlers...), 0}
-}
-
-func IntEnumerate(items IntIterator, handler ...IntEnumHandler) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return IntDiscard(IntEnumHandling(items, handler...))
 }

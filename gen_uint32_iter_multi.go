@@ -30,6 +30,7 @@ func (it *doubleUint32Iterator) Err() error {
 	return it.rhs.Err()
 }
 
+// SuperUint32Iterator combines all iterators to one.
 func SuperUint32Iterator(itemList ...Uint32Iterator) Uint32Iterator {
 	var super Uint32Iterator = EmptyUint32Iterator
 	for i := len(itemList) - 1; i >= 0; i-- {

@@ -8,16 +8,16 @@ import (
 	"github.com/soven/go-iterate/internal/app"
 )
 
-type templateExtTrimmed struct{}
+type templateExtTrimming struct{}
 
-func (m templateExtTrimmed) MakeFileName(templatePath string, _ app.GenerateIterContext,
+func (m templateExtTrimming) MakeFileName(templatePath string, _ app.GenerateIterContext,
 	_ *template.Template) (string, error) {
 	const templateExt = ".tmpl"
 	templateName := filepath.Base(templatePath)
 	return strings.TrimSuffix(templateName, templateExt), nil
 }
 
-var templateExtTrimmedInstance = templateExtTrimmed{}
+var templateExtTrimmingInstance = templateExtTrimming{}
 
 type addTitlePrefixed struct {
 	base fileNameMaker

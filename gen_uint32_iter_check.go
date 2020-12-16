@@ -3,20 +3,33 @@ package iter
 
 import "github.com/pkg/errors"
 
+// Uint32Checker is an object checking an item type of uint32
+// for some condition.
 type Uint32Checker interface {
+	// Check should check an item type of uint32 for some condition.
 	// It is suggested to return EndOfUint32Iterator to stop iteration.
 	Check(uint32) (bool, error)
 }
 
+// Uint32Check is a shortcut implementation
+// of Uint32Checker based on a function.
 type Uint32Check func(uint32) (bool, error)
 
+// Check checks an item type of uint32 for some condition.
+// It returns EndOfUint32Iterator to stop iteration.
 func (ch Uint32Check) Check(item uint32) (bool, error) { return ch(item) }
 
 var (
-	AlwaysUint32CheckTrue  = Uint32Check(func(item uint32) (bool, error) { return true, nil })
-	AlwaysUint32CheckFalse = Uint32Check(func(item uint32) (bool, error) { return false, nil })
+	// AlwaysUint32CheckTrue always returns true and empty error.
+	AlwaysUint32CheckTrue Uint32Checker = Uint32Check(
+		func(item uint32) (bool, error) { return true, nil })
+	// AlwaysUint32CheckFalse always returns false and empty error.
+	AlwaysUint32CheckFalse Uint32Checker = Uint32Check(
+		func(item uint32) (bool, error) { return false, nil })
 )
 
+// NotUint32 do an inversion for checker result.
+// It is returns AlwaysUint32CheckTrue if checker is nil.
 func NotUint32(checker Uint32Checker) Uint32Checker {
 	if checker == nil {
 		return AlwaysUint32CheckTrue
@@ -52,8 +65,11 @@ func (a andUint32) Check(item uint32) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AllUint32 combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true checker if the list of checkers is empty.
 func AllUint32(checkers ...Uint32Checker) Uint32Checker {
-	var all Uint32Checker = AlwaysUint32CheckTrue
+	var all = AlwaysUint32CheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -83,8 +99,11 @@ func (o orUint32) Check(item uint32) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// AnyUint32 combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func AnyUint32(checkers ...Uint32Checker) Uint32Checker {
-	var any Uint32Checker = AlwaysUint32CheckFalse
+	var any = AlwaysUint32CheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -94,11 +113,15 @@ func AnyUint32(checkers ...Uint32Checker) Uint32Checker {
 	return any
 }
 
+// FilteringUint32Iterator does iteration with
+// filtering by previously set checker.
 type FilteringUint32Iterator struct {
 	preparedUint32Item
 	filter Uint32Checker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *FilteringUint32Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -135,18 +158,20 @@ func Uint32Filtering(items Uint32Iterator, filters ...Uint32Checker) Uint32Itera
 	return &FilteringUint32Iterator{preparedUint32Item{base: items}, AllUint32(filters...)}
 }
 
-func Uint32Filter(items Uint32Iterator, checker ...Uint32Checker) error {
-	// no error wrapping since no additional context for the error; just return it.
-	return Uint32Discard(Uint32Filtering(items, checker...))
-}
-
+// Uint32EnumChecker is an object checking an item type of uint32
+// and its ordering number in for some condition.
 type Uint32EnumChecker interface {
+	// Check checks an item type of uint32 and its ordering number for some condition.
 	// It is suggested to return EndOfUint32Iterator to stop iteration.
 	Check(int, uint32) (bool, error)
 }
 
+// Uint32EnumCheck is a shortcut implementation
+// of Uint32EnumChecker based on a function.
 type Uint32EnumCheck func(int, uint32) (bool, error)
 
+// Check checks an item type of uint32 and its ordering number for some condition.
+// It returns EndOfUint32Iterator to stop iteration.
 func (ch Uint32EnumCheck) Check(n int, item uint32) (bool, error) { return ch(n, item) }
 
 type enumFromUint32Checker struct {
@@ -157,15 +182,27 @@ func (ch enumFromUint32Checker) Check(_ int, item uint32) (bool, error) {
 	return ch.Uint32Checker.Check(item)
 }
 
+// EnumFromUint32Checker adapts checker type of Uint32Checker
+// to the interface Uint32EnumChecker.
+// If checker is nil it is return based on AlwaysUint32CheckFalse enum checker.
 func EnumFromUint32Checker(checker Uint32Checker) Uint32EnumChecker {
+	if checker == nil {
+		checker = AlwaysUint32CheckFalse
+	}
 	return &enumFromUint32Checker{checker}
 }
 
 var (
-	AlwaysUint32EnumCheckTrue  = EnumFromUint32Checker(AlwaysUint32CheckTrue)
-	AlwaysUint32EnumCheckFalse = EnumFromUint32Checker(AlwaysUint32CheckFalse)
+	// AlwaysUint32EnumCheckTrue always returns true and empty error.
+	AlwaysUint32EnumCheckTrue Uint32EnumChecker = EnumFromUint32Checker(
+		AlwaysUint32CheckTrue)
+	// AlwaysUint32EnumCheckFalse always returns false and empty error.
+	AlwaysUint32EnumCheckFalse Uint32EnumChecker = EnumFromUint32Checker(
+		AlwaysUint32CheckFalse)
 )
 
+// EnumNotUint32 do an inversion for checker result.
+// It is returns AlwaysUint32EnumCheckTrue if checker is nil.
 func EnumNotUint32(checker Uint32EnumChecker) Uint32EnumChecker {
 	if checker == nil {
 		return AlwaysUint32EnumCheckTrue
@@ -201,8 +238,11 @@ func (a enumAndUint32) Check(n int, item uint32) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAllUint32 combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true if the list of checkers is empty.
 func EnumAllUint32(checkers ...Uint32EnumChecker) Uint32EnumChecker {
-	var all Uint32EnumChecker = AlwaysUint32EnumCheckTrue
+	var all = AlwaysUint32EnumCheckTrue
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -232,8 +272,11 @@ func (o enumOrUint32) Check(n int, item uint32) (bool, error) {
 	return isRHSPassed, nil
 }
 
+// EnumAnyUint32 combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
 func EnumAnyUint32(checkers ...Uint32EnumChecker) Uint32EnumChecker {
-	var any Uint32EnumChecker = AlwaysUint32EnumCheckFalse
+	var any = AlwaysUint32EnumCheckFalse
 	for i := len(checkers) - 1; i >= 0; i-- {
 		if checkers[i] == nil {
 			continue
@@ -243,12 +286,16 @@ func EnumAnyUint32(checkers ...Uint32EnumChecker) Uint32EnumChecker {
 	return any
 }
 
+// EnumFilteringUint32Iterator does iteration with
+// filtering by previously set checker.
 type EnumFilteringUint32Iterator struct {
 	preparedUint32Item
 	filter Uint32EnumChecker
 	count  int
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *EnumFilteringUint32Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -286,11 +333,15 @@ func Uint32EnumFiltering(items Uint32Iterator, filters ...Uint32EnumChecker) Uin
 	return &EnumFilteringUint32Iterator{preparedUint32Item{base: items}, EnumAllUint32(filters...), 0}
 }
 
+// DoingUntilUint32Iterator does iteration
+// until previously set checker is passed.
 type DoingUntilUint32Iterator struct {
 	preparedUint32Item
 	until Uint32Checker
 }
 
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
 func (it *DoingUntilUint32Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
@@ -327,7 +378,8 @@ func Uint32DoingUntil(items Uint32Iterator, untilList ...Uint32Checker) Uint32It
 	return &DoingUntilUint32Iterator{preparedUint32Item{base: items}, AllUint32(untilList...)}
 }
 
-func Uint32DoUntil(items Uint32Iterator, untilList ...Uint32Checker) error {
+// Uint32SkipUntil sets until conditions to skip few items.
+func Uint32SkipUntil(items Uint32Iterator, untilList ...Uint32Checker) error {
 	// no error wrapping since no additional context for the error; just return it.
 	return Uint32Discard(Uint32DoingUntil(items, untilList...))
 }
