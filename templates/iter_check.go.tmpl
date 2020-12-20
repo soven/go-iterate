@@ -158,6 +158,63 @@ func {{ .TitlePrefix }}Filtering(items {{ .TitlePrefix }}Iterator, filters ...{{
 	return &Filtering{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, All{{ .TitlePrefix }}(filters...)}
 }
 
+// DoingUntil{{ .TitlePrefix }}Iterator does iteration
+// until previously set checker is passed.
+type DoingUntil{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	until {{ .TitlePrefix }}Checker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntil{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOf{{ .TitlePrefix }}Iterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}DoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func {{ .TitlePrefix }}DoingUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	var until {{ .TitlePrefix }}Checker
+	if len(untilList) > 0 {
+		until = All{{ .TitlePrefix }}(untilList...)
+	} else {
+		until = Always{{ .TitlePrefix }}CheckFalse
+	}
+	return &DoingUntil{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, until}
+}
+
+// {{ .TitlePrefix }}SkipUntil sets until conditions to skip few items.
+func {{ .TitlePrefix }}SkipUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}Checker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}DoingUntil(items, untilList...))
+}
+
 // {{ .TitlePrefix }}EnumChecker is an object checking an item type of {{ .TypeName }}
 // and its ordering number in for some condition.
 type {{ .TitlePrefix }}EnumChecker interface {
@@ -194,10 +251,10 @@ func EnumFrom{{ .TitlePrefix }}Checker(checker {{ .TitlePrefix }}Checker) {{ .Ti
 
 var (
 	// Always{{ .TitlePrefix }}EnumCheckTrue always returns true and empty error.
-	Always{{ .TitlePrefix }}EnumCheckTrue {{ .TitlePrefix }}EnumChecker = EnumFrom{{ .TitlePrefix }}Checker(
+	Always{{ .TitlePrefix }}EnumCheckTrue = EnumFrom{{ .TitlePrefix }}Checker(
 		Always{{ .TitlePrefix }}CheckTrue)
 	// Always{{ .TitlePrefix }}EnumCheckFalse always returns false and empty error.
-	Always{{ .TitlePrefix }}EnumCheckFalse {{ .TitlePrefix }}EnumChecker = EnumFrom{{ .TitlePrefix }}Checker(
+	Always{{ .TitlePrefix }}EnumCheckFalse = EnumFrom{{ .TitlePrefix }}Checker(
 		Always{{ .TitlePrefix }}CheckFalse)
 )
 
@@ -333,22 +390,23 @@ func {{ .TitlePrefix }}EnumFiltering(items {{ .TitlePrefix }}Iterator, filters .
 	return &EnumFiltering{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, EnumAll{{ .TitlePrefix }}(filters...), 0}
 }
 
-// DoingUntil{{ .TitlePrefix }}Iterator does iteration
+// EnumDoingUntil{{ .TitlePrefix }}Iterator does iteration
 // until previously set checker is passed.
-type DoingUntil{{ .TitlePrefix }}Iterator struct {
+type EnumDoingUntil{{ .TitlePrefix }}Iterator struct {
 	prepared{{ .TitlePrefix }}Item
-	until {{ .TitlePrefix }}Checker
+	until {{ .TitlePrefix }}EnumChecker
+	count int
 }
 
 // HasNext checks if there is the next item
 // in the iterator. HasNext is idempotent.
-func (it *DoingUntil{{ .TitlePrefix }}Iterator) HasNext() bool {
+func (it *EnumDoingUntil{{ .TitlePrefix }}Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
 	}
 	for it.prepared{{ .TitlePrefix }}Item.HasNext() {
 		next := it.base.Next()
-		isUntilPassed, err := it.until.Check(next)
+		isUntilPassed, err := it.until.Check(it.count, next)
 		if err != nil {
 			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
 				err = errors.Wrap(err, "doing until iterator: until")
@@ -356,6 +414,7 @@ func (it *DoingUntil{{ .TitlePrefix }}Iterator) HasNext() bool {
 			it.err = err
 			return false
 		}
+		it.count++
 
 		if isUntilPassed {
 			it.err = EndOf{{ .TitlePrefix }}Iterator
@@ -369,19 +428,25 @@ func (it *DoingUntil{{ .TitlePrefix }}Iterator) HasNext() bool {
 	return false
 }
 
-// {{ .TitlePrefix }}DoingUntil sets until checker while iterating over items.
+// {{ .TitlePrefix }}EnumDoingUntil sets until checker while iterating over items.
 // If untilList is empty, so all items returned as is.
-func {{ .TitlePrefix }}DoingUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Iterator {
+func {{ .TitlePrefix }}EnumDoingUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}Iterator {
 	if items == nil {
 		return Empty{{ .TitlePrefix }}Iterator
 	}
-	return &DoingUntil{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, All{{ .TitlePrefix }}(untilList...)}
+	var until {{ .TitlePrefix }}EnumChecker
+	if len(untilList) > 0 {
+		until = EnumAll{{ .TitlePrefix }}(untilList...)
+	} else {
+		until = Always{{ .TitlePrefix }}EnumCheckFalse
+	}
+	return &EnumDoingUntil{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, until, 0}
 }
 
-// {{ .TitlePrefix }}SkipUntil sets until conditions to skip few items.
-func {{ .TitlePrefix }}SkipUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}Checker) error {
+// {{ .TitlePrefix }}EnumSkipUntil sets until conditions to skip few items.
+func {{ .TitlePrefix }}EnumSkipUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}EnumChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
-	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}DoingUntil(items, untilList...))
+	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}EnumDoingUntil(items, untilList...))
 }
 
 // {{ .TitlePrefix }}GettingBatch returns the next batch from items.
@@ -393,9 +458,7 @@ func {{ .TitlePrefix }}GettingBatch(items {{ .TitlePrefix }}Iterator, batchSize 
 		return items
 	}
 
-	size := 0
-	return {{ .TitlePrefix }}DoingUntil(items, {{ .TitlePrefix }}Check(func(item {{ .TypeName }}) (bool, error) {
-		size++
-		return size >= batchSize, nil
+	return {{ .TitlePrefix }}EnumDoingUntil(items, {{ .TitlePrefix }}EnumCheck(func(n int, item {{ .TypeName }}) (bool, error) {
+		return n == batchSize-1, nil
 	}))
 }

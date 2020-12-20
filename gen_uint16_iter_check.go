@@ -158,6 +158,63 @@ func Uint16Filtering(items Uint16Iterator, filters ...Uint16Checker) Uint16Itera
 	return &FilteringUint16Iterator{preparedUint16Item{base: items}, AllUint16(filters...)}
 }
 
+// DoingUntilUint16Iterator does iteration
+// until previously set checker is passed.
+type DoingUntilUint16Iterator struct {
+	preparedUint16Item
+	until Uint16Checker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntilUint16Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.preparedUint16Item.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOfUint16Iterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOfUint16Iterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// Uint16DoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func Uint16DoingUntil(items Uint16Iterator, untilList ...Uint16Checker) Uint16Iterator {
+	if items == nil {
+		return EmptyUint16Iterator
+	}
+	var until Uint16Checker
+	if len(untilList) > 0 {
+		until = AllUint16(untilList...)
+	} else {
+		until = AlwaysUint16CheckFalse
+	}
+	return &DoingUntilUint16Iterator{preparedUint16Item{base: items}, until}
+}
+
+// Uint16SkipUntil sets until conditions to skip few items.
+func Uint16SkipUntil(items Uint16Iterator, untilList ...Uint16Checker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return Uint16Discard(Uint16DoingUntil(items, untilList...))
+}
+
 // Uint16EnumChecker is an object checking an item type of uint16
 // and its ordering number in for some condition.
 type Uint16EnumChecker interface {
@@ -194,10 +251,10 @@ func EnumFromUint16Checker(checker Uint16Checker) Uint16EnumChecker {
 
 var (
 	// AlwaysUint16EnumCheckTrue always returns true and empty error.
-	AlwaysUint16EnumCheckTrue Uint16EnumChecker = EnumFromUint16Checker(
+	AlwaysUint16EnumCheckTrue = EnumFromUint16Checker(
 		AlwaysUint16CheckTrue)
 	// AlwaysUint16EnumCheckFalse always returns false and empty error.
-	AlwaysUint16EnumCheckFalse Uint16EnumChecker = EnumFromUint16Checker(
+	AlwaysUint16EnumCheckFalse = EnumFromUint16Checker(
 		AlwaysUint16CheckFalse)
 )
 
@@ -333,22 +390,23 @@ func Uint16EnumFiltering(items Uint16Iterator, filters ...Uint16EnumChecker) Uin
 	return &EnumFilteringUint16Iterator{preparedUint16Item{base: items}, EnumAllUint16(filters...), 0}
 }
 
-// DoingUntilUint16Iterator does iteration
+// EnumDoingUntilUint16Iterator does iteration
 // until previously set checker is passed.
-type DoingUntilUint16Iterator struct {
+type EnumDoingUntilUint16Iterator struct {
 	preparedUint16Item
-	until Uint16Checker
+	until Uint16EnumChecker
+	count int
 }
 
 // HasNext checks if there is the next item
 // in the iterator. HasNext is idempotent.
-func (it *DoingUntilUint16Iterator) HasNext() bool {
+func (it *EnumDoingUntilUint16Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
 	}
 	for it.preparedUint16Item.HasNext() {
 		next := it.base.Next()
-		isUntilPassed, err := it.until.Check(next)
+		isUntilPassed, err := it.until.Check(it.count, next)
 		if err != nil {
 			if !isEndOfUint16Iterator(err) {
 				err = errors.Wrap(err, "doing until iterator: until")
@@ -356,6 +414,7 @@ func (it *DoingUntilUint16Iterator) HasNext() bool {
 			it.err = err
 			return false
 		}
+		it.count++
 
 		if isUntilPassed {
 			it.err = EndOfUint16Iterator
@@ -369,19 +428,25 @@ func (it *DoingUntilUint16Iterator) HasNext() bool {
 	return false
 }
 
-// Uint16DoingUntil sets until checker while iterating over items.
+// Uint16EnumDoingUntil sets until checker while iterating over items.
 // If untilList is empty, so all items returned as is.
-func Uint16DoingUntil(items Uint16Iterator, untilList ...Uint16Checker) Uint16Iterator {
+func Uint16EnumDoingUntil(items Uint16Iterator, untilList ...Uint16EnumChecker) Uint16Iterator {
 	if items == nil {
 		return EmptyUint16Iterator
 	}
-	return &DoingUntilUint16Iterator{preparedUint16Item{base: items}, AllUint16(untilList...)}
+	var until Uint16EnumChecker
+	if len(untilList) > 0 {
+		until = EnumAllUint16(untilList...)
+	} else {
+		until = AlwaysUint16EnumCheckFalse
+	}
+	return &EnumDoingUntilUint16Iterator{preparedUint16Item{base: items}, until, 0}
 }
 
-// Uint16SkipUntil sets until conditions to skip few items.
-func Uint16SkipUntil(items Uint16Iterator, untilList ...Uint16Checker) error {
+// Uint16EnumSkipUntil sets until conditions to skip few items.
+func Uint16EnumSkipUntil(items Uint16Iterator, untilList ...Uint16EnumChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
-	return Uint16Discard(Uint16DoingUntil(items, untilList...))
+	return Uint16Discard(Uint16EnumDoingUntil(items, untilList...))
 }
 
 // Uint16GettingBatch returns the next batch from items.
@@ -393,9 +458,7 @@ func Uint16GettingBatch(items Uint16Iterator, batchSize int) Uint16Iterator {
 		return items
 	}
 
-	size := 0
-	return Uint16DoingUntil(items, Uint16Check(func(item uint16) (bool, error) {
-		size++
-		return size >= batchSize, nil
+	return Uint16EnumDoingUntil(items, Uint16EnumCheck(func(n int, item uint16) (bool, error) {
+		return n == batchSize-1, nil
 	}))
 }

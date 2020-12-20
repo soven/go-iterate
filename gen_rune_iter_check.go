@@ -158,6 +158,63 @@ func RuneFiltering(items RuneIterator, filters ...RuneChecker) RuneIterator {
 	return &FilteringRuneIterator{preparedRuneItem{base: items}, AllRune(filters...)}
 }
 
+// DoingUntilRuneIterator does iteration
+// until previously set checker is passed.
+type DoingUntilRuneIterator struct {
+	preparedRuneItem
+	until RuneChecker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntilRuneIterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.preparedRuneItem.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOfRuneIterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOfRuneIterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// RuneDoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func RuneDoingUntil(items RuneIterator, untilList ...RuneChecker) RuneIterator {
+	if items == nil {
+		return EmptyRuneIterator
+	}
+	var until RuneChecker
+	if len(untilList) > 0 {
+		until = AllRune(untilList...)
+	} else {
+		until = AlwaysRuneCheckFalse
+	}
+	return &DoingUntilRuneIterator{preparedRuneItem{base: items}, until}
+}
+
+// RuneSkipUntil sets until conditions to skip few items.
+func RuneSkipUntil(items RuneIterator, untilList ...RuneChecker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return RuneDiscard(RuneDoingUntil(items, untilList...))
+}
+
 // RuneEnumChecker is an object checking an item type of rune
 // and its ordering number in for some condition.
 type RuneEnumChecker interface {
@@ -194,10 +251,10 @@ func EnumFromRuneChecker(checker RuneChecker) RuneEnumChecker {
 
 var (
 	// AlwaysRuneEnumCheckTrue always returns true and empty error.
-	AlwaysRuneEnumCheckTrue RuneEnumChecker = EnumFromRuneChecker(
+	AlwaysRuneEnumCheckTrue = EnumFromRuneChecker(
 		AlwaysRuneCheckTrue)
 	// AlwaysRuneEnumCheckFalse always returns false and empty error.
-	AlwaysRuneEnumCheckFalse RuneEnumChecker = EnumFromRuneChecker(
+	AlwaysRuneEnumCheckFalse = EnumFromRuneChecker(
 		AlwaysRuneCheckFalse)
 )
 
@@ -333,22 +390,23 @@ func RuneEnumFiltering(items RuneIterator, filters ...RuneEnumChecker) RuneItera
 	return &EnumFilteringRuneIterator{preparedRuneItem{base: items}, EnumAllRune(filters...), 0}
 }
 
-// DoingUntilRuneIterator does iteration
+// EnumDoingUntilRuneIterator does iteration
 // until previously set checker is passed.
-type DoingUntilRuneIterator struct {
+type EnumDoingUntilRuneIterator struct {
 	preparedRuneItem
-	until RuneChecker
+	until RuneEnumChecker
+	count int
 }
 
 // HasNext checks if there is the next item
 // in the iterator. HasNext is idempotent.
-func (it *DoingUntilRuneIterator) HasNext() bool {
+func (it *EnumDoingUntilRuneIterator) HasNext() bool {
 	if it.hasNext {
 		return true
 	}
 	for it.preparedRuneItem.HasNext() {
 		next := it.base.Next()
-		isUntilPassed, err := it.until.Check(next)
+		isUntilPassed, err := it.until.Check(it.count, next)
 		if err != nil {
 			if !isEndOfRuneIterator(err) {
 				err = errors.Wrap(err, "doing until iterator: until")
@@ -356,6 +414,7 @@ func (it *DoingUntilRuneIterator) HasNext() bool {
 			it.err = err
 			return false
 		}
+		it.count++
 
 		if isUntilPassed {
 			it.err = EndOfRuneIterator
@@ -369,19 +428,25 @@ func (it *DoingUntilRuneIterator) HasNext() bool {
 	return false
 }
 
-// RuneDoingUntil sets until checker while iterating over items.
+// RuneEnumDoingUntil sets until checker while iterating over items.
 // If untilList is empty, so all items returned as is.
-func RuneDoingUntil(items RuneIterator, untilList ...RuneChecker) RuneIterator {
+func RuneEnumDoingUntil(items RuneIterator, untilList ...RuneEnumChecker) RuneIterator {
 	if items == nil {
 		return EmptyRuneIterator
 	}
-	return &DoingUntilRuneIterator{preparedRuneItem{base: items}, AllRune(untilList...)}
+	var until RuneEnumChecker
+	if len(untilList) > 0 {
+		until = EnumAllRune(untilList...)
+	} else {
+		until = AlwaysRuneEnumCheckFalse
+	}
+	return &EnumDoingUntilRuneIterator{preparedRuneItem{base: items}, until, 0}
 }
 
-// RuneSkipUntil sets until conditions to skip few items.
-func RuneSkipUntil(items RuneIterator, untilList ...RuneChecker) error {
+// RuneEnumSkipUntil sets until conditions to skip few items.
+func RuneEnumSkipUntil(items RuneIterator, untilList ...RuneEnumChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
-	return RuneDiscard(RuneDoingUntil(items, untilList...))
+	return RuneDiscard(RuneEnumDoingUntil(items, untilList...))
 }
 
 // RuneGettingBatch returns the next batch from items.
@@ -393,9 +458,7 @@ func RuneGettingBatch(items RuneIterator, batchSize int) RuneIterator {
 		return items
 	}
 
-	size := 0
-	return RuneDoingUntil(items, RuneCheck(func(item rune) (bool, error) {
-		size++
-		return size >= batchSize, nil
+	return RuneEnumDoingUntil(items, RuneEnumCheck(func(n int, item rune) (bool, error) {
+		return n == batchSize-1, nil
 	}))
 }

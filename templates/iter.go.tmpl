@@ -46,7 +46,7 @@ var MakeNo{{ .TitlePrefix }}Iter {{ .TitlePrefix }}IterMaker = Make{{ .TitlePref
 // {{ .TitlePrefix }}Discard just range over all items and do nothing with each of them.
 func {{ .TitlePrefix }}Discard(items {{ .TitlePrefix }}Iterator) error {
 	if items == nil {
-		return nil
+		items = Empty{{ .TitlePrefix }}Iterator
 	}
 	for items.HasNext() {
 		_ = items.Next()

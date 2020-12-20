@@ -46,7 +46,7 @@ var MakeNoInt64Iter Int64IterMaker = MakeInt64Iter(
 // Int64Discard just range over all items and do nothing with each of them.
 func Int64Discard(items Int64Iterator) error {
 	if items == nil {
-		return nil
+		items = EmptyInt64Iterator
 	}
 	for items.HasNext() {
 		_ = items.Next()

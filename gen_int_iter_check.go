@@ -158,6 +158,63 @@ func IntFiltering(items IntIterator, filters ...IntChecker) IntIterator {
 	return &FilteringIntIterator{preparedIntItem{base: items}, AllInt(filters...)}
 }
 
+// DoingUntilIntIterator does iteration
+// until previously set checker is passed.
+type DoingUntilIntIterator struct {
+	preparedIntItem
+	until IntChecker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntilIntIterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.preparedIntItem.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOfIntIterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOfIntIterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// IntDoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func IntDoingUntil(items IntIterator, untilList ...IntChecker) IntIterator {
+	if items == nil {
+		return EmptyIntIterator
+	}
+	var until IntChecker
+	if len(untilList) > 0 {
+		until = AllInt(untilList...)
+	} else {
+		until = AlwaysIntCheckFalse
+	}
+	return &DoingUntilIntIterator{preparedIntItem{base: items}, until}
+}
+
+// IntSkipUntil sets until conditions to skip few items.
+func IntSkipUntil(items IntIterator, untilList ...IntChecker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return IntDiscard(IntDoingUntil(items, untilList...))
+}
+
 // IntEnumChecker is an object checking an item type of int
 // and its ordering number in for some condition.
 type IntEnumChecker interface {
@@ -194,10 +251,10 @@ func EnumFromIntChecker(checker IntChecker) IntEnumChecker {
 
 var (
 	// AlwaysIntEnumCheckTrue always returns true and empty error.
-	AlwaysIntEnumCheckTrue IntEnumChecker = EnumFromIntChecker(
+	AlwaysIntEnumCheckTrue = EnumFromIntChecker(
 		AlwaysIntCheckTrue)
 	// AlwaysIntEnumCheckFalse always returns false and empty error.
-	AlwaysIntEnumCheckFalse IntEnumChecker = EnumFromIntChecker(
+	AlwaysIntEnumCheckFalse = EnumFromIntChecker(
 		AlwaysIntCheckFalse)
 )
 
@@ -333,22 +390,23 @@ func IntEnumFiltering(items IntIterator, filters ...IntEnumChecker) IntIterator 
 	return &EnumFilteringIntIterator{preparedIntItem{base: items}, EnumAllInt(filters...), 0}
 }
 
-// DoingUntilIntIterator does iteration
+// EnumDoingUntilIntIterator does iteration
 // until previously set checker is passed.
-type DoingUntilIntIterator struct {
+type EnumDoingUntilIntIterator struct {
 	preparedIntItem
-	until IntChecker
+	until IntEnumChecker
+	count int
 }
 
 // HasNext checks if there is the next item
 // in the iterator. HasNext is idempotent.
-func (it *DoingUntilIntIterator) HasNext() bool {
+func (it *EnumDoingUntilIntIterator) HasNext() bool {
 	if it.hasNext {
 		return true
 	}
 	for it.preparedIntItem.HasNext() {
 		next := it.base.Next()
-		isUntilPassed, err := it.until.Check(next)
+		isUntilPassed, err := it.until.Check(it.count, next)
 		if err != nil {
 			if !isEndOfIntIterator(err) {
 				err = errors.Wrap(err, "doing until iterator: until")
@@ -356,6 +414,7 @@ func (it *DoingUntilIntIterator) HasNext() bool {
 			it.err = err
 			return false
 		}
+		it.count++
 
 		if isUntilPassed {
 			it.err = EndOfIntIterator
@@ -369,19 +428,25 @@ func (it *DoingUntilIntIterator) HasNext() bool {
 	return false
 }
 
-// IntDoingUntil sets until checker while iterating over items.
+// IntEnumDoingUntil sets until checker while iterating over items.
 // If untilList is empty, so all items returned as is.
-func IntDoingUntil(items IntIterator, untilList ...IntChecker) IntIterator {
+func IntEnumDoingUntil(items IntIterator, untilList ...IntEnumChecker) IntIterator {
 	if items == nil {
 		return EmptyIntIterator
 	}
-	return &DoingUntilIntIterator{preparedIntItem{base: items}, AllInt(untilList...)}
+	var until IntEnumChecker
+	if len(untilList) > 0 {
+		until = EnumAllInt(untilList...)
+	} else {
+		until = AlwaysIntEnumCheckFalse
+	}
+	return &EnumDoingUntilIntIterator{preparedIntItem{base: items}, until, 0}
 }
 
-// IntSkipUntil sets until conditions to skip few items.
-func IntSkipUntil(items IntIterator, untilList ...IntChecker) error {
+// IntEnumSkipUntil sets until conditions to skip few items.
+func IntEnumSkipUntil(items IntIterator, untilList ...IntEnumChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
-	return IntDiscard(IntDoingUntil(items, untilList...))
+	return IntDiscard(IntEnumDoingUntil(items, untilList...))
 }
 
 // IntGettingBatch returns the next batch from items.
@@ -393,9 +458,7 @@ func IntGettingBatch(items IntIterator, batchSize int) IntIterator {
 		return items
 	}
 
-	size := 0
-	return IntDoingUntil(items, IntCheck(func(item int) (bool, error) {
-		size++
-		return size >= batchSize, nil
+	return IntEnumDoingUntil(items, IntEnumCheck(func(n int, item int) (bool, error) {
+		return n == batchSize-1, nil
 	}))
 }

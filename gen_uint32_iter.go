@@ -46,7 +46,7 @@ var MakeNoUint32Iter Uint32IterMaker = MakeUint32Iter(
 // Uint32Discard just range over all items and do nothing with each of them.
 func Uint32Discard(items Uint32Iterator) error {
 	if items == nil {
-		return nil
+		items = EmptyUint32Iterator
 	}
 	for items.HasNext() {
 		_ = items.Next()

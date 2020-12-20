@@ -46,7 +46,7 @@ var MakeNoUint8Iter Uint8IterMaker = MakeUint8Iter(
 // Uint8Discard just range over all items and do nothing with each of them.
 func Uint8Discard(items Uint8Iterator) error {
 	if items == nil {
-		return nil
+		items = EmptyUint8Iterator
 	}
 	for items.HasNext() {
 		_ = items.Next()

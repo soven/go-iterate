@@ -158,6 +158,63 @@ func Filtering(items Iterator, filters ...Checker) Iterator {
 	return &FilteringIterator{preparedItem{base: items}, All(filters...)}
 }
 
+// DoingUntilIterator does iteration
+// until previously set checker is passed.
+type DoingUntilIterator struct {
+	preparedItem
+	until Checker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntilIterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.preparedItem.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOfIterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOfIterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// DoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func DoingUntil(items Iterator, untilList ...Checker) Iterator {
+	if items == nil {
+		return EmptyIterator
+	}
+	var until Checker
+	if len(untilList) > 0 {
+		until = All(untilList...)
+	} else {
+		until = AlwaysCheckFalse
+	}
+	return &DoingUntilIterator{preparedItem{base: items}, until}
+}
+
+// SkipUntil sets until conditions to skip few items.
+func SkipUntil(items Iterator, untilList ...Checker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return Discard(DoingUntil(items, untilList...))
+}
+
 // EnumChecker is an object checking an item type of interface{}
 // and its ordering number in for some condition.
 type EnumChecker interface {
@@ -194,10 +251,10 @@ func EnumFromChecker(checker Checker) EnumChecker {
 
 var (
 	// AlwaysEnumCheckTrue always returns true and empty error.
-	AlwaysEnumCheckTrue EnumChecker = EnumFromChecker(
+	AlwaysEnumCheckTrue = EnumFromChecker(
 		AlwaysCheckTrue)
 	// AlwaysEnumCheckFalse always returns false and empty error.
-	AlwaysEnumCheckFalse EnumChecker = EnumFromChecker(
+	AlwaysEnumCheckFalse = EnumFromChecker(
 		AlwaysCheckFalse)
 )
 
@@ -333,22 +390,23 @@ func EnumFiltering(items Iterator, filters ...EnumChecker) Iterator {
 	return &EnumFilteringIterator{preparedItem{base: items}, EnumAll(filters...), 0}
 }
 
-// DoingUntilIterator does iteration
+// EnumDoingUntilIterator does iteration
 // until previously set checker is passed.
-type DoingUntilIterator struct {
+type EnumDoingUntilIterator struct {
 	preparedItem
-	until Checker
+	until EnumChecker
+	count int
 }
 
 // HasNext checks if there is the next item
 // in the iterator. HasNext is idempotent.
-func (it *DoingUntilIterator) HasNext() bool {
+func (it *EnumDoingUntilIterator) HasNext() bool {
 	if it.hasNext {
 		return true
 	}
 	for it.preparedItem.HasNext() {
 		next := it.base.Next()
-		isUntilPassed, err := it.until.Check(next)
+		isUntilPassed, err := it.until.Check(it.count, next)
 		if err != nil {
 			if !isEndOfIterator(err) {
 				err = errors.Wrap(err, "doing until iterator: until")
@@ -356,6 +414,7 @@ func (it *DoingUntilIterator) HasNext() bool {
 			it.err = err
 			return false
 		}
+		it.count++
 
 		if isUntilPassed {
 			it.err = EndOfIterator
@@ -369,19 +428,25 @@ func (it *DoingUntilIterator) HasNext() bool {
 	return false
 }
 
-// DoingUntil sets until checker while iterating over items.
+// EnumDoingUntil sets until checker while iterating over items.
 // If untilList is empty, so all items returned as is.
-func DoingUntil(items Iterator, untilList ...Checker) Iterator {
+func EnumDoingUntil(items Iterator, untilList ...EnumChecker) Iterator {
 	if items == nil {
 		return EmptyIterator
 	}
-	return &DoingUntilIterator{preparedItem{base: items}, All(untilList...)}
+	var until EnumChecker
+	if len(untilList) > 0 {
+		until = EnumAll(untilList...)
+	} else {
+		until = AlwaysEnumCheckFalse
+	}
+	return &EnumDoingUntilIterator{preparedItem{base: items}, until, 0}
 }
 
-// SkipUntil sets until conditions to skip few items.
-func SkipUntil(items Iterator, untilList ...Checker) error {
+// EnumSkipUntil sets until conditions to skip few items.
+func EnumSkipUntil(items Iterator, untilList ...EnumChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
-	return Discard(DoingUntil(items, untilList...))
+	return Discard(EnumDoingUntil(items, untilList...))
 }
 
 // GettingBatch returns the next batch from items.
@@ -393,9 +458,7 @@ func GettingBatch(items Iterator, batchSize int) Iterator {
 		return items
 	}
 
-	size := 0
-	return DoingUntil(items, Check(func(item interface{}) (bool, error) {
-		size++
-		return size >= batchSize, nil
+	return EnumDoingUntil(items, EnumCheck(func(n int, item interface{}) (bool, error) {
+		return n == batchSize-1, nil
 	}))
 }

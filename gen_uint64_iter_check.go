@@ -158,6 +158,63 @@ func Uint64Filtering(items Uint64Iterator, filters ...Uint64Checker) Uint64Itera
 	return &FilteringUint64Iterator{preparedUint64Item{base: items}, AllUint64(filters...)}
 }
 
+// DoingUntilUint64Iterator does iteration
+// until previously set checker is passed.
+type DoingUntilUint64Iterator struct {
+	preparedUint64Item
+	until Uint64Checker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntilUint64Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.preparedUint64Item.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOfUint64Iterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOfUint64Iterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// Uint64DoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func Uint64DoingUntil(items Uint64Iterator, untilList ...Uint64Checker) Uint64Iterator {
+	if items == nil {
+		return EmptyUint64Iterator
+	}
+	var until Uint64Checker
+	if len(untilList) > 0 {
+		until = AllUint64(untilList...)
+	} else {
+		until = AlwaysUint64CheckFalse
+	}
+	return &DoingUntilUint64Iterator{preparedUint64Item{base: items}, until}
+}
+
+// Uint64SkipUntil sets until conditions to skip few items.
+func Uint64SkipUntil(items Uint64Iterator, untilList ...Uint64Checker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return Uint64Discard(Uint64DoingUntil(items, untilList...))
+}
+
 // Uint64EnumChecker is an object checking an item type of uint64
 // and its ordering number in for some condition.
 type Uint64EnumChecker interface {
@@ -194,10 +251,10 @@ func EnumFromUint64Checker(checker Uint64Checker) Uint64EnumChecker {
 
 var (
 	// AlwaysUint64EnumCheckTrue always returns true and empty error.
-	AlwaysUint64EnumCheckTrue Uint64EnumChecker = EnumFromUint64Checker(
+	AlwaysUint64EnumCheckTrue = EnumFromUint64Checker(
 		AlwaysUint64CheckTrue)
 	// AlwaysUint64EnumCheckFalse always returns false and empty error.
-	AlwaysUint64EnumCheckFalse Uint64EnumChecker = EnumFromUint64Checker(
+	AlwaysUint64EnumCheckFalse = EnumFromUint64Checker(
 		AlwaysUint64CheckFalse)
 )
 
@@ -333,22 +390,23 @@ func Uint64EnumFiltering(items Uint64Iterator, filters ...Uint64EnumChecker) Uin
 	return &EnumFilteringUint64Iterator{preparedUint64Item{base: items}, EnumAllUint64(filters...), 0}
 }
 
-// DoingUntilUint64Iterator does iteration
+// EnumDoingUntilUint64Iterator does iteration
 // until previously set checker is passed.
-type DoingUntilUint64Iterator struct {
+type EnumDoingUntilUint64Iterator struct {
 	preparedUint64Item
-	until Uint64Checker
+	until Uint64EnumChecker
+	count int
 }
 
 // HasNext checks if there is the next item
 // in the iterator. HasNext is idempotent.
-func (it *DoingUntilUint64Iterator) HasNext() bool {
+func (it *EnumDoingUntilUint64Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
 	}
 	for it.preparedUint64Item.HasNext() {
 		next := it.base.Next()
-		isUntilPassed, err := it.until.Check(next)
+		isUntilPassed, err := it.until.Check(it.count, next)
 		if err != nil {
 			if !isEndOfUint64Iterator(err) {
 				err = errors.Wrap(err, "doing until iterator: until")
@@ -356,6 +414,7 @@ func (it *DoingUntilUint64Iterator) HasNext() bool {
 			it.err = err
 			return false
 		}
+		it.count++
 
 		if isUntilPassed {
 			it.err = EndOfUint64Iterator
@@ -369,19 +428,25 @@ func (it *DoingUntilUint64Iterator) HasNext() bool {
 	return false
 }
 
-// Uint64DoingUntil sets until checker while iterating over items.
+// Uint64EnumDoingUntil sets until checker while iterating over items.
 // If untilList is empty, so all items returned as is.
-func Uint64DoingUntil(items Uint64Iterator, untilList ...Uint64Checker) Uint64Iterator {
+func Uint64EnumDoingUntil(items Uint64Iterator, untilList ...Uint64EnumChecker) Uint64Iterator {
 	if items == nil {
 		return EmptyUint64Iterator
 	}
-	return &DoingUntilUint64Iterator{preparedUint64Item{base: items}, AllUint64(untilList...)}
+	var until Uint64EnumChecker
+	if len(untilList) > 0 {
+		until = EnumAllUint64(untilList...)
+	} else {
+		until = AlwaysUint64EnumCheckFalse
+	}
+	return &EnumDoingUntilUint64Iterator{preparedUint64Item{base: items}, until, 0}
 }
 
-// Uint64SkipUntil sets until conditions to skip few items.
-func Uint64SkipUntil(items Uint64Iterator, untilList ...Uint64Checker) error {
+// Uint64EnumSkipUntil sets until conditions to skip few items.
+func Uint64EnumSkipUntil(items Uint64Iterator, untilList ...Uint64EnumChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
-	return Uint64Discard(Uint64DoingUntil(items, untilList...))
+	return Uint64Discard(Uint64EnumDoingUntil(items, untilList...))
 }
 
 // Uint64GettingBatch returns the next batch from items.
@@ -393,9 +458,7 @@ func Uint64GettingBatch(items Uint64Iterator, batchSize int) Uint64Iterator {
 		return items
 	}
 
-	size := 0
-	return Uint64DoingUntil(items, Uint64Check(func(item uint64) (bool, error) {
-		size++
-		return size >= batchSize, nil
+	return Uint64EnumDoingUntil(items, Uint64EnumCheck(func(n int, item uint64) (bool, error) {
+		return n == batchSize-1, nil
 	}))
 }

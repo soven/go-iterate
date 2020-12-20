@@ -45,7 +45,7 @@ var MakeNoPrefixIter PrefixIterMaker = MakePrefixIter(
 // PrefixDiscard just range over all items and do nothing with each of them.
 func PrefixDiscard(items PrefixIterator) error {
 	if items == nil {
-		return nil
+		items = EmptyPrefixIterator
 	}
 	for items.HasNext() {
 		_ = items.Next()

@@ -1,6 +1,10 @@
 GOCMD := "go"
 GOBIN := $(shell command -v $(GOCMD) 2> /dev/null)
 CURDIR := $(shell pwd)
+MOCKERYCMD := "mockery"
+MOCKERYBIN := $(shell command -v $(MOCKERYCMD) 2> /dev/null)
+MOCK_SOURCE_DIR := $(CURDIR)/internal/testground/resembled
+MOCKS_DIR := $(MOCK_SOURCE_DIR)/mocks
 GEN_ITER_KIT_CMD := $(CURDIR)/cmd/gen-go-iter-kit/main.go
 ASSEMBLE_TEMPLATES_CMD := $(CURDIR)/cmd/assemble-templates/main.go
 ASSEMBLE_TEMPLATES_PATH := templates
@@ -60,3 +64,11 @@ assemble_all: clean_assembled
 		-target $(ASSEMBLE_TEMPLATES_TYPE_FROM) -prefix $(ASSEMBLE_TEMPLATES_PREFIX_FROM) \
 		-zero $(ASSEMBLE_TEMPLATES_ZERO_FROM) -package $(ASSEMBLE_TEMPLATES_PACKAGE_FROM)
 .PHONY: assemble_all
+
+clean_mocks:
+	rm -rf $(MOCKS_DIR)
+
+mocks: clean_mocks
+	mockery --dir=$(MOCK_SOURCE_DIR) --output=$(MOCKS_DIR) --name=PrefixIterator
+	mockery --dir=$(MOCK_SOURCE_DIR) --output=$(MOCKS_DIR) --name=PrefixChecker
+	mockery --dir=$(MOCK_SOURCE_DIR) --output=$(MOCKS_DIR) --name=PrefixEnumChecker

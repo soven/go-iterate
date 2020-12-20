@@ -158,6 +158,63 @@ func StringFiltering(items StringIterator, filters ...StringChecker) StringItera
 	return &FilteringStringIterator{preparedStringItem{base: items}, AllString(filters...)}
 }
 
+// DoingUntilStringIterator does iteration
+// until previously set checker is passed.
+type DoingUntilStringIterator struct {
+	preparedStringItem
+	until StringChecker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntilStringIterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.preparedStringItem.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOfStringIterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOfStringIterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// StringDoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func StringDoingUntil(items StringIterator, untilList ...StringChecker) StringIterator {
+	if items == nil {
+		return EmptyStringIterator
+	}
+	var until StringChecker
+	if len(untilList) > 0 {
+		until = AllString(untilList...)
+	} else {
+		until = AlwaysStringCheckFalse
+	}
+	return &DoingUntilStringIterator{preparedStringItem{base: items}, until}
+}
+
+// StringSkipUntil sets until conditions to skip few items.
+func StringSkipUntil(items StringIterator, untilList ...StringChecker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return StringDiscard(StringDoingUntil(items, untilList...))
+}
+
 // StringEnumChecker is an object checking an item type of string
 // and its ordering number in for some condition.
 type StringEnumChecker interface {
@@ -194,10 +251,10 @@ func EnumFromStringChecker(checker StringChecker) StringEnumChecker {
 
 var (
 	// AlwaysStringEnumCheckTrue always returns true and empty error.
-	AlwaysStringEnumCheckTrue StringEnumChecker = EnumFromStringChecker(
+	AlwaysStringEnumCheckTrue = EnumFromStringChecker(
 		AlwaysStringCheckTrue)
 	// AlwaysStringEnumCheckFalse always returns false and empty error.
-	AlwaysStringEnumCheckFalse StringEnumChecker = EnumFromStringChecker(
+	AlwaysStringEnumCheckFalse = EnumFromStringChecker(
 		AlwaysStringCheckFalse)
 )
 
@@ -333,22 +390,23 @@ func StringEnumFiltering(items StringIterator, filters ...StringEnumChecker) Str
 	return &EnumFilteringStringIterator{preparedStringItem{base: items}, EnumAllString(filters...), 0}
 }
 
-// DoingUntilStringIterator does iteration
+// EnumDoingUntilStringIterator does iteration
 // until previously set checker is passed.
-type DoingUntilStringIterator struct {
+type EnumDoingUntilStringIterator struct {
 	preparedStringItem
-	until StringChecker
+	until StringEnumChecker
+	count int
 }
 
 // HasNext checks if there is the next item
 // in the iterator. HasNext is idempotent.
-func (it *DoingUntilStringIterator) HasNext() bool {
+func (it *EnumDoingUntilStringIterator) HasNext() bool {
 	if it.hasNext {
 		return true
 	}
 	for it.preparedStringItem.HasNext() {
 		next := it.base.Next()
-		isUntilPassed, err := it.until.Check(next)
+		isUntilPassed, err := it.until.Check(it.count, next)
 		if err != nil {
 			if !isEndOfStringIterator(err) {
 				err = errors.Wrap(err, "doing until iterator: until")
@@ -356,6 +414,7 @@ func (it *DoingUntilStringIterator) HasNext() bool {
 			it.err = err
 			return false
 		}
+		it.count++
 
 		if isUntilPassed {
 			it.err = EndOfStringIterator
@@ -369,19 +428,25 @@ func (it *DoingUntilStringIterator) HasNext() bool {
 	return false
 }
 
-// StringDoingUntil sets until checker while iterating over items.
+// StringEnumDoingUntil sets until checker while iterating over items.
 // If untilList is empty, so all items returned as is.
-func StringDoingUntil(items StringIterator, untilList ...StringChecker) StringIterator {
+func StringEnumDoingUntil(items StringIterator, untilList ...StringEnumChecker) StringIterator {
 	if items == nil {
 		return EmptyStringIterator
 	}
-	return &DoingUntilStringIterator{preparedStringItem{base: items}, AllString(untilList...)}
+	var until StringEnumChecker
+	if len(untilList) > 0 {
+		until = EnumAllString(untilList...)
+	} else {
+		until = AlwaysStringEnumCheckFalse
+	}
+	return &EnumDoingUntilStringIterator{preparedStringItem{base: items}, until, 0}
 }
 
-// StringSkipUntil sets until conditions to skip few items.
-func StringSkipUntil(items StringIterator, untilList ...StringChecker) error {
+// StringEnumSkipUntil sets until conditions to skip few items.
+func StringEnumSkipUntil(items StringIterator, untilList ...StringEnumChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
-	return StringDiscard(StringDoingUntil(items, untilList...))
+	return StringDiscard(StringEnumDoingUntil(items, untilList...))
 }
 
 // StringGettingBatch returns the next batch from items.
@@ -393,9 +458,7 @@ func StringGettingBatch(items StringIterator, batchSize int) StringIterator {
 		return items
 	}
 
-	size := 0
-	return StringDoingUntil(items, StringCheck(func(item string) (bool, error) {
-		size++
-		return size >= batchSize, nil
+	return StringEnumDoingUntil(items, StringEnumCheck(func(n int, item string) (bool, error) {
+		return n == batchSize-1, nil
 	}))
 }

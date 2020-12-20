@@ -158,6 +158,63 @@ func Uint8Filtering(items Uint8Iterator, filters ...Uint8Checker) Uint8Iterator 
 	return &FilteringUint8Iterator{preparedUint8Item{base: items}, AllUint8(filters...)}
 }
 
+// DoingUntilUint8Iterator does iteration
+// until previously set checker is passed.
+type DoingUntilUint8Iterator struct {
+	preparedUint8Item
+	until Uint8Checker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntilUint8Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.preparedUint8Item.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOfUint8Iterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOfUint8Iterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// Uint8DoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func Uint8DoingUntil(items Uint8Iterator, untilList ...Uint8Checker) Uint8Iterator {
+	if items == nil {
+		return EmptyUint8Iterator
+	}
+	var until Uint8Checker
+	if len(untilList) > 0 {
+		until = AllUint8(untilList...)
+	} else {
+		until = AlwaysUint8CheckFalse
+	}
+	return &DoingUntilUint8Iterator{preparedUint8Item{base: items}, until}
+}
+
+// Uint8SkipUntil sets until conditions to skip few items.
+func Uint8SkipUntil(items Uint8Iterator, untilList ...Uint8Checker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return Uint8Discard(Uint8DoingUntil(items, untilList...))
+}
+
 // Uint8EnumChecker is an object checking an item type of uint8
 // and its ordering number in for some condition.
 type Uint8EnumChecker interface {
@@ -194,10 +251,10 @@ func EnumFromUint8Checker(checker Uint8Checker) Uint8EnumChecker {
 
 var (
 	// AlwaysUint8EnumCheckTrue always returns true and empty error.
-	AlwaysUint8EnumCheckTrue Uint8EnumChecker = EnumFromUint8Checker(
+	AlwaysUint8EnumCheckTrue = EnumFromUint8Checker(
 		AlwaysUint8CheckTrue)
 	// AlwaysUint8EnumCheckFalse always returns false and empty error.
-	AlwaysUint8EnumCheckFalse Uint8EnumChecker = EnumFromUint8Checker(
+	AlwaysUint8EnumCheckFalse = EnumFromUint8Checker(
 		AlwaysUint8CheckFalse)
 )
 
@@ -333,22 +390,23 @@ func Uint8EnumFiltering(items Uint8Iterator, filters ...Uint8EnumChecker) Uint8I
 	return &EnumFilteringUint8Iterator{preparedUint8Item{base: items}, EnumAllUint8(filters...), 0}
 }
 
-// DoingUntilUint8Iterator does iteration
+// EnumDoingUntilUint8Iterator does iteration
 // until previously set checker is passed.
-type DoingUntilUint8Iterator struct {
+type EnumDoingUntilUint8Iterator struct {
 	preparedUint8Item
-	until Uint8Checker
+	until Uint8EnumChecker
+	count int
 }
 
 // HasNext checks if there is the next item
 // in the iterator. HasNext is idempotent.
-func (it *DoingUntilUint8Iterator) HasNext() bool {
+func (it *EnumDoingUntilUint8Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
 	}
 	for it.preparedUint8Item.HasNext() {
 		next := it.base.Next()
-		isUntilPassed, err := it.until.Check(next)
+		isUntilPassed, err := it.until.Check(it.count, next)
 		if err != nil {
 			if !isEndOfUint8Iterator(err) {
 				err = errors.Wrap(err, "doing until iterator: until")
@@ -356,6 +414,7 @@ func (it *DoingUntilUint8Iterator) HasNext() bool {
 			it.err = err
 			return false
 		}
+		it.count++
 
 		if isUntilPassed {
 			it.err = EndOfUint8Iterator
@@ -369,19 +428,25 @@ func (it *DoingUntilUint8Iterator) HasNext() bool {
 	return false
 }
 
-// Uint8DoingUntil sets until checker while iterating over items.
+// Uint8EnumDoingUntil sets until checker while iterating over items.
 // If untilList is empty, so all items returned as is.
-func Uint8DoingUntil(items Uint8Iterator, untilList ...Uint8Checker) Uint8Iterator {
+func Uint8EnumDoingUntil(items Uint8Iterator, untilList ...Uint8EnumChecker) Uint8Iterator {
 	if items == nil {
 		return EmptyUint8Iterator
 	}
-	return &DoingUntilUint8Iterator{preparedUint8Item{base: items}, AllUint8(untilList...)}
+	var until Uint8EnumChecker
+	if len(untilList) > 0 {
+		until = EnumAllUint8(untilList...)
+	} else {
+		until = AlwaysUint8EnumCheckFalse
+	}
+	return &EnumDoingUntilUint8Iterator{preparedUint8Item{base: items}, until, 0}
 }
 
-// Uint8SkipUntil sets until conditions to skip few items.
-func Uint8SkipUntil(items Uint8Iterator, untilList ...Uint8Checker) error {
+// Uint8EnumSkipUntil sets until conditions to skip few items.
+func Uint8EnumSkipUntil(items Uint8Iterator, untilList ...Uint8EnumChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
-	return Uint8Discard(Uint8DoingUntil(items, untilList...))
+	return Uint8Discard(Uint8EnumDoingUntil(items, untilList...))
 }
 
 // Uint8GettingBatch returns the next batch from items.
@@ -393,9 +458,7 @@ func Uint8GettingBatch(items Uint8Iterator, batchSize int) Uint8Iterator {
 		return items
 	}
 
-	size := 0
-	return Uint8DoingUntil(items, Uint8Check(func(item uint8) (bool, error) {
-		size++
-		return size >= batchSize, nil
+	return Uint8EnumDoingUntil(items, Uint8EnumCheck(func(n int, item uint8) (bool, error) {
+		return n == batchSize-1, nil
 	}))
 }

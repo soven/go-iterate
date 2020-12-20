@@ -46,7 +46,7 @@ var MakeNoByteIter ByteIterMaker = MakeByteIter(
 // ByteDiscard just range over all items and do nothing with each of them.
 func ByteDiscard(items ByteIterator) error {
 	if items == nil {
-		return nil
+		items = EmptyByteIterator
 	}
 	for items.HasNext() {
 		_ = items.Next()

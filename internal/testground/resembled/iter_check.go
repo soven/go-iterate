@@ -157,6 +157,63 @@ func PrefixFiltering(items PrefixIterator, filters ...PrefixChecker) PrefixItera
 	return &FilteringPrefixIterator{preparedPrefixItem{base: items}, AllPrefix(filters...)}
 }
 
+// DoingUntilPrefixIterator does iteration
+// until previously set checker is passed.
+type DoingUntilPrefixIterator struct {
+	preparedPrefixItem
+	until PrefixChecker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntilPrefixIterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.preparedPrefixItem.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOfPrefixIterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOfPrefixIterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// PrefixDoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func PrefixDoingUntil(items PrefixIterator, untilList ...PrefixChecker) PrefixIterator {
+	if items == nil {
+		return EmptyPrefixIterator
+	}
+	var until PrefixChecker
+	if len(untilList) > 0 {
+		until = AllPrefix(untilList...)
+	} else {
+		until = AlwaysPrefixCheckFalse
+	}
+	return &DoingUntilPrefixIterator{preparedPrefixItem{base: items}, until}
+}
+
+// PrefixSkipUntil sets until conditions to skip few items.
+func PrefixSkipUntil(items PrefixIterator, untilList ...PrefixChecker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return PrefixDiscard(PrefixDoingUntil(items, untilList...))
+}
+
 // PrefixEnumChecker is an object checking an item type of Type
 // and its ordering number in for some condition.
 type PrefixEnumChecker interface {
@@ -193,10 +250,10 @@ func EnumFromPrefixChecker(checker PrefixChecker) PrefixEnumChecker {
 
 var (
 	// AlwaysPrefixEnumCheckTrue always returns true and empty error.
-	AlwaysPrefixEnumCheckTrue PrefixEnumChecker = EnumFromPrefixChecker(
+	AlwaysPrefixEnumCheckTrue = EnumFromPrefixChecker(
 		AlwaysPrefixCheckTrue)
 	// AlwaysPrefixEnumCheckFalse always returns false and empty error.
-	AlwaysPrefixEnumCheckFalse PrefixEnumChecker = EnumFromPrefixChecker(
+	AlwaysPrefixEnumCheckFalse = EnumFromPrefixChecker(
 		AlwaysPrefixCheckFalse)
 )
 
@@ -332,22 +389,23 @@ func PrefixEnumFiltering(items PrefixIterator, filters ...PrefixEnumChecker) Pre
 	return &EnumFilteringPrefixIterator{preparedPrefixItem{base: items}, EnumAllPrefix(filters...), 0}
 }
 
-// DoingUntilPrefixIterator does iteration
+// EnumDoingUntilPrefixIterator does iteration
 // until previously set checker is passed.
-type DoingUntilPrefixIterator struct {
+type EnumDoingUntilPrefixIterator struct {
 	preparedPrefixItem
-	until PrefixChecker
+	until PrefixEnumChecker
+	count int
 }
 
 // HasNext checks if there is the next item
 // in the iterator. HasNext is idempotent.
-func (it *DoingUntilPrefixIterator) HasNext() bool {
+func (it *EnumDoingUntilPrefixIterator) HasNext() bool {
 	if it.hasNext {
 		return true
 	}
 	for it.preparedPrefixItem.HasNext() {
 		next := it.base.Next()
-		isUntilPassed, err := it.until.Check(next)
+		isUntilPassed, err := it.until.Check(it.count, next)
 		if err != nil {
 			if !isEndOfPrefixIterator(err) {
 				err = errors.Wrap(err, "doing until iterator: until")
@@ -355,6 +413,7 @@ func (it *DoingUntilPrefixIterator) HasNext() bool {
 			it.err = err
 			return false
 		}
+		it.count++
 
 		if isUntilPassed {
 			it.err = EndOfPrefixIterator
@@ -368,19 +427,25 @@ func (it *DoingUntilPrefixIterator) HasNext() bool {
 	return false
 }
 
-// PrefixDoingUntil sets until checker while iterating over items.
+// PrefixEnumDoingUntil sets until checker while iterating over items.
 // If untilList is empty, so all items returned as is.
-func PrefixDoingUntil(items PrefixIterator, untilList ...PrefixChecker) PrefixIterator {
+func PrefixEnumDoingUntil(items PrefixIterator, untilList ...PrefixEnumChecker) PrefixIterator {
 	if items == nil {
 		return EmptyPrefixIterator
 	}
-	return &DoingUntilPrefixIterator{preparedPrefixItem{base: items}, AllPrefix(untilList...)}
+	var until PrefixEnumChecker
+	if len(untilList) > 0 {
+		until = EnumAllPrefix(untilList...)
+	} else {
+		until = AlwaysPrefixEnumCheckFalse
+	}
+	return &EnumDoingUntilPrefixIterator{preparedPrefixItem{base: items}, until, 0}
 }
 
-// PrefixSkipUntil sets until conditions to skip few items.
-func PrefixSkipUntil(items PrefixIterator, untilList ...PrefixChecker) error {
+// PrefixEnumSkipUntil sets until conditions to skip few items.
+func PrefixEnumSkipUntil(items PrefixIterator, untilList ...PrefixEnumChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
-	return PrefixDiscard(PrefixDoingUntil(items, untilList...))
+	return PrefixDiscard(PrefixEnumDoingUntil(items, untilList...))
 }
 
 // PrefixGettingBatch returns the next batch from items.
@@ -392,9 +457,7 @@ func PrefixGettingBatch(items PrefixIterator, batchSize int) PrefixIterator {
 		return items
 	}
 
-	size := 0
-	return PrefixDoingUntil(items, PrefixCheck(func(item Type) (bool, error) {
-		size++
-		return size >= batchSize, nil
+	return PrefixEnumDoingUntil(items, PrefixEnumCheck(func(n int, item Type) (bool, error) {
+		return n == batchSize-1, nil
 	}))
 }

@@ -46,7 +46,7 @@ var MakeNoRuneIter RuneIterMaker = MakeRuneIter(
 // RuneDiscard just range over all items and do nothing with each of them.
 func RuneDiscard(items RuneIterator) error {
 	if items == nil {
-		return nil
+		items = EmptyRuneIterator
 	}
 	for items.HasNext() {
 		_ = items.Next()

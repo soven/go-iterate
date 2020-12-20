@@ -46,7 +46,7 @@ var MakeNoInt16Iter Int16IterMaker = MakeInt16Iter(
 // Int16Discard just range over all items and do nothing with each of them.
 func Int16Discard(items Int16Iterator) error {
 	if items == nil {
-		return nil
+		items = EmptyInt16Iterator
 	}
 	for items.HasNext() {
 		_ = items.Next()

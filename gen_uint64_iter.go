@@ -46,7 +46,7 @@ var MakeNoUint64Iter Uint64IterMaker = MakeUint64Iter(
 // Uint64Discard just range over all items and do nothing with each of them.
 func Uint64Discard(items Uint64Iterator) error {
 	if items == nil {
-		return nil
+		items = EmptyUint64Iterator
 	}
 	for items.HasNext() {
 		_ = items.Next()

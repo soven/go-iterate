@@ -158,6 +158,63 @@ func ByteFiltering(items ByteIterator, filters ...ByteChecker) ByteIterator {
 	return &FilteringByteIterator{preparedByteItem{base: items}, AllByte(filters...)}
 }
 
+// DoingUntilByteIterator does iteration
+// until previously set checker is passed.
+type DoingUntilByteIterator struct {
+	preparedByteItem
+	until ByteChecker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntilByteIterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.preparedByteItem.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOfByteIterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOfByteIterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// ByteDoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func ByteDoingUntil(items ByteIterator, untilList ...ByteChecker) ByteIterator {
+	if items == nil {
+		return EmptyByteIterator
+	}
+	var until ByteChecker
+	if len(untilList) > 0 {
+		until = AllByte(untilList...)
+	} else {
+		until = AlwaysByteCheckFalse
+	}
+	return &DoingUntilByteIterator{preparedByteItem{base: items}, until}
+}
+
+// ByteSkipUntil sets until conditions to skip few items.
+func ByteSkipUntil(items ByteIterator, untilList ...ByteChecker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return ByteDiscard(ByteDoingUntil(items, untilList...))
+}
+
 // ByteEnumChecker is an object checking an item type of byte
 // and its ordering number in for some condition.
 type ByteEnumChecker interface {
@@ -194,10 +251,10 @@ func EnumFromByteChecker(checker ByteChecker) ByteEnumChecker {
 
 var (
 	// AlwaysByteEnumCheckTrue always returns true and empty error.
-	AlwaysByteEnumCheckTrue ByteEnumChecker = EnumFromByteChecker(
+	AlwaysByteEnumCheckTrue = EnumFromByteChecker(
 		AlwaysByteCheckTrue)
 	// AlwaysByteEnumCheckFalse always returns false and empty error.
-	AlwaysByteEnumCheckFalse ByteEnumChecker = EnumFromByteChecker(
+	AlwaysByteEnumCheckFalse = EnumFromByteChecker(
 		AlwaysByteCheckFalse)
 )
 
@@ -333,22 +390,23 @@ func ByteEnumFiltering(items ByteIterator, filters ...ByteEnumChecker) ByteItera
 	return &EnumFilteringByteIterator{preparedByteItem{base: items}, EnumAllByte(filters...), 0}
 }
 
-// DoingUntilByteIterator does iteration
+// EnumDoingUntilByteIterator does iteration
 // until previously set checker is passed.
-type DoingUntilByteIterator struct {
+type EnumDoingUntilByteIterator struct {
 	preparedByteItem
-	until ByteChecker
+	until ByteEnumChecker
+	count int
 }
 
 // HasNext checks if there is the next item
 // in the iterator. HasNext is idempotent.
-func (it *DoingUntilByteIterator) HasNext() bool {
+func (it *EnumDoingUntilByteIterator) HasNext() bool {
 	if it.hasNext {
 		return true
 	}
 	for it.preparedByteItem.HasNext() {
 		next := it.base.Next()
-		isUntilPassed, err := it.until.Check(next)
+		isUntilPassed, err := it.until.Check(it.count, next)
 		if err != nil {
 			if !isEndOfByteIterator(err) {
 				err = errors.Wrap(err, "doing until iterator: until")
@@ -356,6 +414,7 @@ func (it *DoingUntilByteIterator) HasNext() bool {
 			it.err = err
 			return false
 		}
+		it.count++
 
 		if isUntilPassed {
 			it.err = EndOfByteIterator
@@ -369,19 +428,25 @@ func (it *DoingUntilByteIterator) HasNext() bool {
 	return false
 }
 
-// ByteDoingUntil sets until checker while iterating over items.
+// ByteEnumDoingUntil sets until checker while iterating over items.
 // If untilList is empty, so all items returned as is.
-func ByteDoingUntil(items ByteIterator, untilList ...ByteChecker) ByteIterator {
+func ByteEnumDoingUntil(items ByteIterator, untilList ...ByteEnumChecker) ByteIterator {
 	if items == nil {
 		return EmptyByteIterator
 	}
-	return &DoingUntilByteIterator{preparedByteItem{base: items}, AllByte(untilList...)}
+	var until ByteEnumChecker
+	if len(untilList) > 0 {
+		until = EnumAllByte(untilList...)
+	} else {
+		until = AlwaysByteEnumCheckFalse
+	}
+	return &EnumDoingUntilByteIterator{preparedByteItem{base: items}, until, 0}
 }
 
-// ByteSkipUntil sets until conditions to skip few items.
-func ByteSkipUntil(items ByteIterator, untilList ...ByteChecker) error {
+// ByteEnumSkipUntil sets until conditions to skip few items.
+func ByteEnumSkipUntil(items ByteIterator, untilList ...ByteEnumChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
-	return ByteDiscard(ByteDoingUntil(items, untilList...))
+	return ByteDiscard(ByteEnumDoingUntil(items, untilList...))
 }
 
 // ByteGettingBatch returns the next batch from items.
@@ -393,9 +458,7 @@ func ByteGettingBatch(items ByteIterator, batchSize int) ByteIterator {
 		return items
 	}
 
-	size := 0
-	return ByteDoingUntil(items, ByteCheck(func(item byte) (bool, error) {
-		size++
-		return size >= batchSize, nil
+	return ByteEnumDoingUntil(items, ByteEnumCheck(func(n int, item byte) (bool, error) {
+		return n == batchSize-1, nil
 	}))
 }

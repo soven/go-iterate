@@ -46,7 +46,7 @@ var MakeNoIter IterMaker = MakeIter(
 // Discard just range over all items and do nothing with each of them.
 func Discard(items Iterator) error {
 	if items == nil {
-		return nil
+		items = EmptyIterator
 	}
 	for items.HasNext() {
 		_ = items.Next()

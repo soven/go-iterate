@@ -158,6 +158,63 @@ func Int32Filtering(items Int32Iterator, filters ...Int32Checker) Int32Iterator 
 	return &FilteringInt32Iterator{preparedInt32Item{base: items}, AllInt32(filters...)}
 }
 
+// DoingUntilInt32Iterator does iteration
+// until previously set checker is passed.
+type DoingUntilInt32Iterator struct {
+	preparedInt32Item
+	until Int32Checker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntilInt32Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.preparedInt32Item.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOfInt32Iterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOfInt32Iterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// Int32DoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func Int32DoingUntil(items Int32Iterator, untilList ...Int32Checker) Int32Iterator {
+	if items == nil {
+		return EmptyInt32Iterator
+	}
+	var until Int32Checker
+	if len(untilList) > 0 {
+		until = AllInt32(untilList...)
+	} else {
+		until = AlwaysInt32CheckFalse
+	}
+	return &DoingUntilInt32Iterator{preparedInt32Item{base: items}, until}
+}
+
+// Int32SkipUntil sets until conditions to skip few items.
+func Int32SkipUntil(items Int32Iterator, untilList ...Int32Checker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return Int32Discard(Int32DoingUntil(items, untilList...))
+}
+
 // Int32EnumChecker is an object checking an item type of int32
 // and its ordering number in for some condition.
 type Int32EnumChecker interface {
@@ -194,10 +251,10 @@ func EnumFromInt32Checker(checker Int32Checker) Int32EnumChecker {
 
 var (
 	// AlwaysInt32EnumCheckTrue always returns true and empty error.
-	AlwaysInt32EnumCheckTrue Int32EnumChecker = EnumFromInt32Checker(
+	AlwaysInt32EnumCheckTrue = EnumFromInt32Checker(
 		AlwaysInt32CheckTrue)
 	// AlwaysInt32EnumCheckFalse always returns false and empty error.
-	AlwaysInt32EnumCheckFalse Int32EnumChecker = EnumFromInt32Checker(
+	AlwaysInt32EnumCheckFalse = EnumFromInt32Checker(
 		AlwaysInt32CheckFalse)
 )
 
@@ -333,22 +390,23 @@ func Int32EnumFiltering(items Int32Iterator, filters ...Int32EnumChecker) Int32I
 	return &EnumFilteringInt32Iterator{preparedInt32Item{base: items}, EnumAllInt32(filters...), 0}
 }
 
-// DoingUntilInt32Iterator does iteration
+// EnumDoingUntilInt32Iterator does iteration
 // until previously set checker is passed.
-type DoingUntilInt32Iterator struct {
+type EnumDoingUntilInt32Iterator struct {
 	preparedInt32Item
-	until Int32Checker
+	until Int32EnumChecker
+	count int
 }
 
 // HasNext checks if there is the next item
 // in the iterator. HasNext is idempotent.
-func (it *DoingUntilInt32Iterator) HasNext() bool {
+func (it *EnumDoingUntilInt32Iterator) HasNext() bool {
 	if it.hasNext {
 		return true
 	}
 	for it.preparedInt32Item.HasNext() {
 		next := it.base.Next()
-		isUntilPassed, err := it.until.Check(next)
+		isUntilPassed, err := it.until.Check(it.count, next)
 		if err != nil {
 			if !isEndOfInt32Iterator(err) {
 				err = errors.Wrap(err, "doing until iterator: until")
@@ -356,6 +414,7 @@ func (it *DoingUntilInt32Iterator) HasNext() bool {
 			it.err = err
 			return false
 		}
+		it.count++
 
 		if isUntilPassed {
 			it.err = EndOfInt32Iterator
@@ -369,19 +428,25 @@ func (it *DoingUntilInt32Iterator) HasNext() bool {
 	return false
 }
 
-// Int32DoingUntil sets until checker while iterating over items.
+// Int32EnumDoingUntil sets until checker while iterating over items.
 // If untilList is empty, so all items returned as is.
-func Int32DoingUntil(items Int32Iterator, untilList ...Int32Checker) Int32Iterator {
+func Int32EnumDoingUntil(items Int32Iterator, untilList ...Int32EnumChecker) Int32Iterator {
 	if items == nil {
 		return EmptyInt32Iterator
 	}
-	return &DoingUntilInt32Iterator{preparedInt32Item{base: items}, AllInt32(untilList...)}
+	var until Int32EnumChecker
+	if len(untilList) > 0 {
+		until = EnumAllInt32(untilList...)
+	} else {
+		until = AlwaysInt32EnumCheckFalse
+	}
+	return &EnumDoingUntilInt32Iterator{preparedInt32Item{base: items}, until, 0}
 }
 
-// Int32SkipUntil sets until conditions to skip few items.
-func Int32SkipUntil(items Int32Iterator, untilList ...Int32Checker) error {
+// Int32EnumSkipUntil sets until conditions to skip few items.
+func Int32EnumSkipUntil(items Int32Iterator, untilList ...Int32EnumChecker) error {
 	// no error wrapping since no additional context for the error; just return it.
-	return Int32Discard(Int32DoingUntil(items, untilList...))
+	return Int32Discard(Int32EnumDoingUntil(items, untilList...))
 }
 
 // Int32GettingBatch returns the next batch from items.
@@ -393,9 +458,7 @@ func Int32GettingBatch(items Int32Iterator, batchSize int) Int32Iterator {
 		return items
 	}
 
-	size := 0
-	return Int32DoingUntil(items, Int32Check(func(item int32) (bool, error) {
-		size++
-		return size >= batchSize, nil
+	return Int32EnumDoingUntil(items, Int32EnumCheck(func(n int, item int32) (bool, error) {
+		return n == batchSize-1, nil
 	}))
 }
