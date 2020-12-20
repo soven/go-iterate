@@ -292,7 +292,7 @@ func Test_PrefixFiltering(t *testing.T) {
 	}{
 		{
 			name: "general",
-			iter: mockPrefixIterator([]resembled.Type{1, 2, 3}...),
+			iter: mockPrefixIterator(1, 2, 3),
 			checkers: []resembled.PrefixChecker{
 				resembled.PrefixCheck(func(val resembled.Type) (bool, error) {
 					return val.(int) >= 2, nil
@@ -305,7 +305,7 @@ func Test_PrefixFiltering(t *testing.T) {
 		},
 		{
 			name:     "no checkers",
-			iter:     mockPrefixIterator([]resembled.Type{1, 2, 3}...),
+			iter:     mockPrefixIterator(1, 2, 3),
 			checkers: nil,
 			want:     []resembled.Type{1, 2, 3},
 		},
@@ -345,7 +345,7 @@ func Test_PrefixDoingUntil(t *testing.T) {
 	}{
 		{
 			name: "general",
-			iter: mockPrefixIterator([]resembled.Type{1, 2, 3, 5, 8}...),
+			iter: mockPrefixIterator(1, 2, 3, 5, 8),
 			checkers: []resembled.PrefixChecker{
 				resembled.PrefixCheck(func(val resembled.Type) (bool, error) {
 					return val.(int) == 3, nil
@@ -358,7 +358,7 @@ func Test_PrefixDoingUntil(t *testing.T) {
 		},
 		{
 			name:     "no checkers",
-			iter:     mockPrefixIterator([]resembled.Type{1, 2, 3}...),
+			iter:     mockPrefixIterator(1, 2, 3),
 			checkers: nil,
 			want:     [][]resembled.Type{{1, 2, 3}},
 		},
@@ -404,7 +404,7 @@ func Test_PrefixSkipUntil(t *testing.T) {
 	}{
 		{
 			name: "general",
-			iter: mockPrefixIterator([]resembled.Type{1, 2, 3, 5, 8}...),
+			iter: mockPrefixIterator(1, 2, 3, 5, 8),
 			checkers: []resembled.PrefixChecker{
 				resembled.PrefixCheck(func(val resembled.Type) (bool, error) {
 					return val.(int) == 3, nil
@@ -414,7 +414,7 @@ func Test_PrefixSkipUntil(t *testing.T) {
 		},
 		{
 			name:     "no checkers",
-			iter:     mockPrefixIterator([]resembled.Type{1, 2, 3}...),
+			iter:     mockPrefixIterator(1, 2, 3),
 			checkers: nil,
 			want:     nil,
 		},
@@ -462,6 +462,11 @@ func Test_EnumFromPrefixChecker(t *testing.T) {
 		{
 			name:    "checker false",
 			checker: mockPrefixChecker(resembled.Zero, false, nil),
+			want:    false,
+		},
+		{
+			name:    "no checker",
+			checker: nil,
 			want:    false,
 		},
 	}
@@ -707,7 +712,7 @@ func Test_PrefixEnumFiltering(t *testing.T) {
 	}{
 		{
 			name: "general",
-			iter: mockPrefixIterator([]resembled.Type{1, 2, 3, 5, 8}...),
+			iter: mockPrefixIterator(1, 2, 3, 5, 8),
 			checkers: []resembled.PrefixEnumChecker{
 				resembled.EnumAnyPrefix(
 					resembled.EnumAllPrefix(
@@ -727,7 +732,7 @@ func Test_PrefixEnumFiltering(t *testing.T) {
 		},
 		{
 			name:     "no checkers",
-			iter:     mockPrefixIterator([]resembled.Type{1, 2, 3}...),
+			iter:     mockPrefixIterator(1, 2, 3),
 			checkers: nil,
 			want:     []resembled.Type{1, 2, 3},
 		},
@@ -767,7 +772,7 @@ func Test_PrefixEnumDoingUntil(t *testing.T) {
 	}{
 		{
 			name: "general",
-			iter: mockPrefixIterator([]resembled.Type{1, 2, 3, 5, 8}...),
+			iter: mockPrefixIterator(1, 2, 3, 5, 8),
 			checkers: []resembled.PrefixEnumChecker{
 				resembled.PrefixEnumCheck(func(n int, val resembled.Type) (bool, error) {
 					return n == 2 && val.(int) == 3, nil
@@ -780,7 +785,7 @@ func Test_PrefixEnumDoingUntil(t *testing.T) {
 		},
 		{
 			name:     "no checkers",
-			iter:     mockPrefixIterator([]resembled.Type{1, 2, 3}...),
+			iter:     mockPrefixIterator(1, 2, 3),
 			checkers: nil,
 			want:     [][]resembled.Type{{1, 2, 3}},
 		},
@@ -826,7 +831,7 @@ func Test_PrefixEnumSkipUntil(t *testing.T) {
 	}{
 		{
 			name: "general",
-			iter: mockPrefixIterator([]resembled.Type{1, 2, 3, 5, 8}...),
+			iter: mockPrefixIterator(1, 2, 3, 5, 8),
 			checkers: []resembled.PrefixEnumChecker{
 				resembled.PrefixEnumCheck(func(n int, val resembled.Type) (bool, error) {
 					return n == 2 && val.(int) == 3, nil
@@ -836,7 +841,7 @@ func Test_PrefixEnumSkipUntil(t *testing.T) {
 		},
 		{
 			name:     "no checkers",
-			iter:     mockPrefixIterator([]resembled.Type{1, 2, 3}...),
+			iter:     mockPrefixIterator(1, 2, 3),
 			checkers: nil,
 			want:     nil,
 		},
@@ -879,7 +884,7 @@ func Test_PrefixGettingBatch(t *testing.T) {
 	}{
 		{
 			name:    "general",
-			iter:    mockPrefixIterator([]resembled.Type{1, 2, 3, 5, 8}...),
+			iter:    mockPrefixIterator(1, 2, 3, 5, 8),
 			batchBy: 2,
 			want: [][]resembled.Type{
 				{1, 2},
