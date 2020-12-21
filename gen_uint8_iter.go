@@ -26,22 +26,20 @@ var EmptyUint8Iterator Uint8Iterator = emptyUint8Iterator{}
 // Uint8IterMaker is a maker of Uint8Iterator.
 type Uint8IterMaker interface {
 	// MakeIter should return a new instance of Uint8Iterator to iterate over it.
-	// It is suggested to return EmptyUint8Iterator if the error is not nil.
-	MakeIter() (Uint8Iterator, error)
+	MakeIter() Uint8Iterator
 }
 
 // MakeUint8Iter is a shortcut implementation
 // of Uint8Iterator based on a function.
-type MakeUint8Iter func() (Uint8Iterator, error)
+type MakeUint8Iter func() Uint8Iterator
 
 // MakeIter returns a new instance of Uint8Iterator to iterate over it.
-// It returns EmptyUint8Iterator if the error is not nil.
-func (m MakeUint8Iter) MakeIter() (Uint8Iterator, error) { return m() }
+func (m MakeUint8Iter) MakeIter() Uint8Iterator { return m() }
 
 // MakeNoUint8Iter is a zero value for Uint8IterMaker.
 // It always returns EmptyUint8Iterator and an empty error.
 var MakeNoUint8Iter Uint8IterMaker = MakeUint8Iter(
-	func() (Uint8Iterator, error) { return EmptyUint8Iterator, nil })
+	func() Uint8Iterator { return EmptyUint8Iterator })
 
 // Uint8Discard just range over all items and do nothing with each of them.
 func Uint8Discard(items Uint8Iterator) error {

@@ -26,22 +26,20 @@ var EmptyUint16Iterator Uint16Iterator = emptyUint16Iterator{}
 // Uint16IterMaker is a maker of Uint16Iterator.
 type Uint16IterMaker interface {
 	// MakeIter should return a new instance of Uint16Iterator to iterate over it.
-	// It is suggested to return EmptyUint16Iterator if the error is not nil.
-	MakeIter() (Uint16Iterator, error)
+	MakeIter() Uint16Iterator
 }
 
 // MakeUint16Iter is a shortcut implementation
 // of Uint16Iterator based on a function.
-type MakeUint16Iter func() (Uint16Iterator, error)
+type MakeUint16Iter func() Uint16Iterator
 
 // MakeIter returns a new instance of Uint16Iterator to iterate over it.
-// It returns EmptyUint16Iterator if the error is not nil.
-func (m MakeUint16Iter) MakeIter() (Uint16Iterator, error) { return m() }
+func (m MakeUint16Iter) MakeIter() Uint16Iterator { return m() }
 
 // MakeNoUint16Iter is a zero value for Uint16IterMaker.
 // It always returns EmptyUint16Iterator and an empty error.
 var MakeNoUint16Iter Uint16IterMaker = MakeUint16Iter(
-	func() (Uint16Iterator, error) { return EmptyUint16Iterator, nil })
+	func() Uint16Iterator { return EmptyUint16Iterator })
 
 // Uint16Discard just range over all items and do nothing with each of them.
 func Uint16Discard(items Uint16Iterator) error {

@@ -88,16 +88,8 @@ type ByteSlice []byte
 
 // MakeIter returns a new instance of ByteIterator to iterate over it.
 // It returns EmptyByteIterator if the error is not nil.
-func (s ByteSlice) MakeIter() (ByteIterator, error) {
-	return NewShowtimeByteSliceIterator(s), nil
-}
-
-// MakeByteSliceIter it is shortcut for ByteSlice.MakeIter since
-// it does not return an error.
-func MakeByteSliceIter(slice []byte) ByteIterator {
-	items, err := ByteSlice(slice).MakeIter()
-	panicIfByteIteratorError(err, "make slice iter")
-	return items
+func (s ByteSlice) MakeIter() ByteIterator {
+	return NewShowtimeByteSliceIterator(s)
 }
 
 // ByteSlice is a slice of byte which can make inverting iterator.
@@ -105,19 +97,11 @@ type InvertingByteSlice []byte
 
 // MakeIter returns a new instance of ByteIterator to iterate over it.
 // It returns EmptyByteIterator if the error is not nil.
-func (s InvertingByteSlice) MakeIter() (ByteIterator, error) {
-	return NewInvertingShowtimeByteSliceIterator(s), nil
-}
-
-// MakeByteSliceIter it is shortcut for InvertingByteSlice.MakeIter since
-// it does not return an error.
-func MakeInvertingByteSliceIter(slice []byte) ByteIterator {
-	items, err := InvertingByteSlice(slice).MakeIter()
-	panicIfByteIteratorError(err, "make inverting slice iter")
-	return items
+func (s InvertingByteSlice) MakeIter() ByteIterator {
+	return NewInvertingShowtimeByteSliceIterator(s)
 }
 
 // ByteInvert unrolls items and make inverting iterator based on them.
 func ByteInvert(items ByteIterator) ByteIterator {
-	return MakeInvertingByteSliceIter(ByteUnroll(items))
+	return InvertingByteSlice(ByteUnroll(items)).MakeIter()
 }

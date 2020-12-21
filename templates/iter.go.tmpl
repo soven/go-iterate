@@ -26,22 +26,20 @@ var Empty{{ .TitlePrefix }}Iterator {{ .TitlePrefix }}Iterator = empty{{ .TitleP
 // {{ .TitlePrefix }}IterMaker is a maker of {{ .TitlePrefix }}Iterator.
 type {{ .TitlePrefix }}IterMaker interface {
 	// MakeIter should return a new instance of {{ .TitlePrefix }}Iterator to iterate over it.
-	// It is suggested to return Empty{{ .TitlePrefix }}Iterator if the error is not nil.
-	MakeIter() ({{ .TitlePrefix }}Iterator, error)
+	MakeIter() {{ .TitlePrefix }}Iterator
 }
 
 // Make{{ .TitlePrefix }}Iter is a shortcut implementation
 // of {{ .TitlePrefix }}Iterator based on a function.
-type Make{{ .TitlePrefix }}Iter func() ({{ .TitlePrefix }}Iterator, error)
+type Make{{ .TitlePrefix }}Iter func() {{ .TitlePrefix }}Iterator
 
 // MakeIter returns a new instance of {{ .TitlePrefix }}Iterator to iterate over it.
-// It returns Empty{{ .TitlePrefix }}Iterator if the error is not nil.
-func (m Make{{ .TitlePrefix }}Iter) MakeIter() ({{ .TitlePrefix }}Iterator, error) { return m() }
+func (m Make{{ .TitlePrefix }}Iter) MakeIter() {{ .TitlePrefix }}Iterator { return m() }
 
 // MakeNo{{ .TitlePrefix }}Iter is a zero value for {{ .TitlePrefix }}IterMaker.
 // It always returns Empty{{ .TitlePrefix }}Iterator and an empty error.
 var MakeNo{{ .TitlePrefix }}Iter {{ .TitlePrefix }}IterMaker = Make{{ .TitlePrefix }}Iter(
-	func() ({{ .TitlePrefix }}Iterator, error) { return Empty{{ .TitlePrefix }}Iterator, nil })
+	func() {{ .TitlePrefix }}Iterator { return Empty{{ .TitlePrefix }}Iterator })
 
 // {{ .TitlePrefix }}Discard just range over all items and do nothing with each of them.
 func {{ .TitlePrefix }}Discard(items {{ .TitlePrefix }}Iterator) error {

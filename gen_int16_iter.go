@@ -26,22 +26,20 @@ var EmptyInt16Iterator Int16Iterator = emptyInt16Iterator{}
 // Int16IterMaker is a maker of Int16Iterator.
 type Int16IterMaker interface {
 	// MakeIter should return a new instance of Int16Iterator to iterate over it.
-	// It is suggested to return EmptyInt16Iterator if the error is not nil.
-	MakeIter() (Int16Iterator, error)
+	MakeIter() Int16Iterator
 }
 
 // MakeInt16Iter is a shortcut implementation
 // of Int16Iterator based on a function.
-type MakeInt16Iter func() (Int16Iterator, error)
+type MakeInt16Iter func() Int16Iterator
 
 // MakeIter returns a new instance of Int16Iterator to iterate over it.
-// It returns EmptyInt16Iterator if the error is not nil.
-func (m MakeInt16Iter) MakeIter() (Int16Iterator, error) { return m() }
+func (m MakeInt16Iter) MakeIter() Int16Iterator { return m() }
 
 // MakeNoInt16Iter is a zero value for Int16IterMaker.
 // It always returns EmptyInt16Iterator and an empty error.
 var MakeNoInt16Iter Int16IterMaker = MakeInt16Iter(
-	func() (Int16Iterator, error) { return EmptyInt16Iterator, nil })
+	func() Int16Iterator { return EmptyInt16Iterator })
 
 // Int16Discard just range over all items and do nothing with each of them.
 func Int16Discard(items Int16Iterator) error {

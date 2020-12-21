@@ -88,16 +88,8 @@ type Int64Slice []int64
 
 // MakeIter returns a new instance of Int64Iterator to iterate over it.
 // It returns EmptyInt64Iterator if the error is not nil.
-func (s Int64Slice) MakeIter() (Int64Iterator, error) {
-	return NewShowtimeInt64SliceIterator(s), nil
-}
-
-// MakeInt64SliceIter it is shortcut for Int64Slice.MakeIter since
-// it does not return an error.
-func MakeInt64SliceIter(slice []int64) Int64Iterator {
-	items, err := Int64Slice(slice).MakeIter()
-	panicIfInt64IteratorError(err, "make slice iter")
-	return items
+func (s Int64Slice) MakeIter() Int64Iterator {
+	return NewShowtimeInt64SliceIterator(s)
 }
 
 // Int64Slice is a slice of int64 which can make inverting iterator.
@@ -105,19 +97,11 @@ type InvertingInt64Slice []int64
 
 // MakeIter returns a new instance of Int64Iterator to iterate over it.
 // It returns EmptyInt64Iterator if the error is not nil.
-func (s InvertingInt64Slice) MakeIter() (Int64Iterator, error) {
-	return NewInvertingShowtimeInt64SliceIterator(s), nil
-}
-
-// MakeInt64SliceIter it is shortcut for InvertingInt64Slice.MakeIter since
-// it does not return an error.
-func MakeInvertingInt64SliceIter(slice []int64) Int64Iterator {
-	items, err := InvertingInt64Slice(slice).MakeIter()
-	panicIfInt64IteratorError(err, "make inverting slice iter")
-	return items
+func (s InvertingInt64Slice) MakeIter() Int64Iterator {
+	return NewInvertingShowtimeInt64SliceIterator(s)
 }
 
 // Int64Invert unrolls items and make inverting iterator based on them.
 func Int64Invert(items Int64Iterator) Int64Iterator {
-	return MakeInvertingInt64SliceIter(Int64Unroll(items))
+	return InvertingInt64Slice(Int64Unroll(items)).MakeIter()
 }

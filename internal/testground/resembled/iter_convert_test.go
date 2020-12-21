@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 
 	"github.com/soven/go-iterate/internal/testground/resembled"
 	"github.com/soven/go-iterate/internal/testground/resembled/mocks"
@@ -20,12 +21,14 @@ func Test_PrefixConverterSeries(t *testing.T) {
 			name: "general",
 			val:  21,
 			converters: []resembled.PrefixConverter{
-				resembled.PrefixConvert(func(val resembled.Type) (resembled.Type, error) {
-					return val.(int) * 2, nil
-				}),
-				resembled.PrefixConvert(func(val resembled.Type) (resembled.Type, error) {
-					return val.(int) / 3, nil
-				}),
+				mockPrefixConverter(mock.Anything,
+					func(val resembled.Type) resembled.Type { return val.(int) * 2 },
+					func(_ resembled.Type) error { return nil },
+				),
+				mockPrefixConverter(mock.Anything,
+					func(val resembled.Type) resembled.Type { return val.(int) / 3 },
+					func(_ resembled.Type) error { return nil },
+				),
 			},
 			want: 14,
 		},
@@ -48,7 +51,7 @@ func Test_PrefixConverterSeries(t *testing.T) {
 	}
 }
 
-func mockPrefixConverter(val resembled.Type, ret ...interface{}) resembled.PrefixConverter {
+func mockPrefixConverter(val interface{}, ret ...interface{}) resembled.PrefixConverter {
 	m := &mocks.PrefixConverter{}
 	m.
 		On("Convert", val).Return(ret...)
@@ -66,12 +69,14 @@ func Test_PrefixConverting(t *testing.T) {
 			name: "general",
 			iter: mockPrefixIterator(1, 9, 3),
 			converters: []resembled.PrefixConverter{
-				resembled.PrefixConvert(func(val resembled.Type) (resembled.Type, error) {
-					return val.(int) + 2, nil
-				}),
-				resembled.PrefixConvert(func(val resembled.Type) (resembled.Type, error) {
-					return val.(int) * 3, nil
-				}),
+				mockPrefixConverter(mock.Anything,
+					func(val resembled.Type) resembled.Type { return val.(int) + 2 },
+					func(_ resembled.Type) error { return nil },
+				),
+				mockPrefixConverter(mock.Anything,
+					func(val resembled.Type) resembled.Type { return val.(int) * 3 },
+					func(_ resembled.Type) error { return nil },
+				),
 			},
 			want: []resembled.Type{9, 33, 15},
 		},
@@ -153,12 +158,14 @@ func Test_EnumPrefixConverterSeries(t *testing.T) {
 			n:    2,
 			val:  3,
 			converters: []resembled.PrefixEnumConverter{
-				resembled.PrefixEnumConvert(func(n int, val resembled.Type) (resembled.Type, error) {
-					return val.(int) * n, nil
-				}),
-				resembled.PrefixEnumConvert(func(n int, val resembled.Type) (resembled.Type, error) {
-					return val.(int) + n, nil
-				}),
+				mockPrefixEnumConverter(mock.Anything, mock.Anything,
+					func(n int, val resembled.Type) resembled.Type { return val.(int) * n },
+					func(_ int, _ resembled.Type) error { return nil },
+				),
+				mockPrefixEnumConverter(mock.Anything, mock.Anything,
+					func(_ int, val resembled.Type) resembled.Type { return val.(int) + 2 },
+					func(_ int, _ resembled.Type) error { return nil },
+				),
 			},
 			want: 8,
 		},
@@ -181,7 +188,7 @@ func Test_EnumPrefixConverterSeries(t *testing.T) {
 	}
 }
 
-func mockPrefixEnumConverter(n int, val resembled.Type, ret ...interface{}) resembled.PrefixEnumConverter {
+func mockPrefixEnumConverter(n, val interface{}, ret ...interface{}) resembled.PrefixEnumConverter {
 	m := &mocks.PrefixEnumConverter{}
 	m.
 		On("Convert", n, val).Return(ret...)
@@ -199,12 +206,14 @@ func Test_PrefixEnumConverting(t *testing.T) {
 			name: "general",
 			iter: mockPrefixIterator(1, 9, 3),
 			converters: []resembled.PrefixEnumConverter{
-				resembled.PrefixEnumConvert(func(n int, val resembled.Type) (resembled.Type, error) {
-					return val.(int) + n, nil
-				}),
-				resembled.PrefixEnumConvert(func(n int, val resembled.Type) (resembled.Type, error) {
-					return val.(int) * n, nil
-				}),
+				mockPrefixEnumConverter(mock.Anything, mock.Anything,
+					func(n int, val resembled.Type) resembled.Type { return val.(int) + n },
+					func(_ int, _ resembled.Type) error { return nil },
+				),
+				mockPrefixEnumConverter(mock.Anything, mock.Anything,
+					func(n int, val resembled.Type) resembled.Type { return val.(int) * n },
+					func(_ int, _ resembled.Type) error { return nil },
+				),
 			},
 			want: []resembled.Type{0, 10, 10}, // (1+0)*0, (9+1)*1, (3+2)*2
 		},

@@ -26,22 +26,20 @@ var EmptyIterator Iterator = emptyIterator{}
 // IterMaker is a maker of Iterator.
 type IterMaker interface {
 	// MakeIter should return a new instance of Iterator to iterate over it.
-	// It is suggested to return EmptyIterator if the error is not nil.
-	MakeIter() (Iterator, error)
+	MakeIter() Iterator
 }
 
 // MakeIter is a shortcut implementation
 // of Iterator based on a function.
-type MakeIter func() (Iterator, error)
+type MakeIter func() Iterator
 
 // MakeIter returns a new instance of Iterator to iterate over it.
-// It returns EmptyIterator if the error is not nil.
-func (m MakeIter) MakeIter() (Iterator, error) { return m() }
+func (m MakeIter) MakeIter() Iterator { return m() }
 
 // MakeNoIter is a zero value for IterMaker.
 // It always returns EmptyIterator and an empty error.
 var MakeNoIter IterMaker = MakeIter(
-	func() (Iterator, error) { return EmptyIterator, nil })
+	func() Iterator { return EmptyIterator })
 
 // Discard just range over all items and do nothing with each of them.
 func Discard(items Iterator) error {

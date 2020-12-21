@@ -88,16 +88,8 @@ type StringSlice []string
 
 // MakeIter returns a new instance of StringIterator to iterate over it.
 // It returns EmptyStringIterator if the error is not nil.
-func (s StringSlice) MakeIter() (StringIterator, error) {
-	return NewShowtimeStringSliceIterator(s), nil
-}
-
-// MakeStringSliceIter it is shortcut for StringSlice.MakeIter since
-// it does not return an error.
-func MakeStringSliceIter(slice []string) StringIterator {
-	items, err := StringSlice(slice).MakeIter()
-	panicIfStringIteratorError(err, "make slice iter")
-	return items
+func (s StringSlice) MakeIter() StringIterator {
+	return NewShowtimeStringSliceIterator(s)
 }
 
 // StringSlice is a slice of string which can make inverting iterator.
@@ -105,19 +97,11 @@ type InvertingStringSlice []string
 
 // MakeIter returns a new instance of StringIterator to iterate over it.
 // It returns EmptyStringIterator if the error is not nil.
-func (s InvertingStringSlice) MakeIter() (StringIterator, error) {
-	return NewInvertingShowtimeStringSliceIterator(s), nil
-}
-
-// MakeStringSliceIter it is shortcut for InvertingStringSlice.MakeIter since
-// it does not return an error.
-func MakeInvertingStringSliceIter(slice []string) StringIterator {
-	items, err := InvertingStringSlice(slice).MakeIter()
-	panicIfStringIteratorError(err, "make inverting slice iter")
-	return items
+func (s InvertingStringSlice) MakeIter() StringIterator {
+	return NewInvertingShowtimeStringSliceIterator(s)
 }
 
 // StringInvert unrolls items and make inverting iterator based on them.
 func StringInvert(items StringIterator) StringIterator {
-	return MakeInvertingStringSliceIter(StringUnroll(items))
+	return InvertingStringSlice(StringUnroll(items)).MakeIter()
 }

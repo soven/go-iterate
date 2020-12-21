@@ -88,16 +88,8 @@ type Uint32Slice []uint32
 
 // MakeIter returns a new instance of Uint32Iterator to iterate over it.
 // It returns EmptyUint32Iterator if the error is not nil.
-func (s Uint32Slice) MakeIter() (Uint32Iterator, error) {
-	return NewShowtimeUint32SliceIterator(s), nil
-}
-
-// MakeUint32SliceIter it is shortcut for Uint32Slice.MakeIter since
-// it does not return an error.
-func MakeUint32SliceIter(slice []uint32) Uint32Iterator {
-	items, err := Uint32Slice(slice).MakeIter()
-	panicIfUint32IteratorError(err, "make slice iter")
-	return items
+func (s Uint32Slice) MakeIter() Uint32Iterator {
+	return NewShowtimeUint32SliceIterator(s)
 }
 
 // Uint32Slice is a slice of uint32 which can make inverting iterator.
@@ -105,19 +97,11 @@ type InvertingUint32Slice []uint32
 
 // MakeIter returns a new instance of Uint32Iterator to iterate over it.
 // It returns EmptyUint32Iterator if the error is not nil.
-func (s InvertingUint32Slice) MakeIter() (Uint32Iterator, error) {
-	return NewInvertingShowtimeUint32SliceIterator(s), nil
-}
-
-// MakeUint32SliceIter it is shortcut for InvertingUint32Slice.MakeIter since
-// it does not return an error.
-func MakeInvertingUint32SliceIter(slice []uint32) Uint32Iterator {
-	items, err := InvertingUint32Slice(slice).MakeIter()
-	panicIfUint32IteratorError(err, "make inverting slice iter")
-	return items
+func (s InvertingUint32Slice) MakeIter() Uint32Iterator {
+	return NewInvertingShowtimeUint32SliceIterator(s)
 }
 
 // Uint32Invert unrolls items and make inverting iterator based on them.
 func Uint32Invert(items Uint32Iterator) Uint32Iterator {
-	return MakeInvertingUint32SliceIter(Uint32Unroll(items))
+	return InvertingUint32Slice(Uint32Unroll(items)).MakeIter()
 }

@@ -26,22 +26,20 @@ var EmptyStringIterator StringIterator = emptyStringIterator{}
 // StringIterMaker is a maker of StringIterator.
 type StringIterMaker interface {
 	// MakeIter should return a new instance of StringIterator to iterate over it.
-	// It is suggested to return EmptyStringIterator if the error is not nil.
-	MakeIter() (StringIterator, error)
+	MakeIter() StringIterator
 }
 
 // MakeStringIter is a shortcut implementation
 // of StringIterator based on a function.
-type MakeStringIter func() (StringIterator, error)
+type MakeStringIter func() StringIterator
 
 // MakeIter returns a new instance of StringIterator to iterate over it.
-// It returns EmptyStringIterator if the error is not nil.
-func (m MakeStringIter) MakeIter() (StringIterator, error) { return m() }
+func (m MakeStringIter) MakeIter() StringIterator { return m() }
 
 // MakeNoStringIter is a zero value for StringIterMaker.
 // It always returns EmptyStringIterator and an empty error.
 var MakeNoStringIter StringIterMaker = MakeStringIter(
-	func() (StringIterator, error) { return EmptyStringIterator, nil })
+	func() StringIterator { return EmptyStringIterator })
 
 // StringDiscard just range over all items and do nothing with each of them.
 func StringDiscard(items StringIterator) error {

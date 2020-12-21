@@ -88,16 +88,8 @@ type Slice []interface{}
 
 // MakeIter returns a new instance of Iterator to iterate over it.
 // It returns EmptyIterator if the error is not nil.
-func (s Slice) MakeIter() (Iterator, error) {
-	return NewShowtimeSliceIterator(s), nil
-}
-
-// MakeSliceIter it is shortcut for Slice.MakeIter since
-// it does not return an error.
-func MakeSliceIter(slice []interface{}) Iterator {
-	items, err := Slice(slice).MakeIter()
-	panicIfIteratorError(err, "make slice iter")
-	return items
+func (s Slice) MakeIter() Iterator {
+	return NewShowtimeSliceIterator(s)
 }
 
 // Slice is a slice of interface{} which can make inverting iterator.
@@ -105,19 +97,11 @@ type InvertingSlice []interface{}
 
 // MakeIter returns a new instance of Iterator to iterate over it.
 // It returns EmptyIterator if the error is not nil.
-func (s InvertingSlice) MakeIter() (Iterator, error) {
-	return NewInvertingShowtimeSliceIterator(s), nil
-}
-
-// MakeSliceIter it is shortcut for InvertingSlice.MakeIter since
-// it does not return an error.
-func MakeInvertingSliceIter(slice []interface{}) Iterator {
-	items, err := InvertingSlice(slice).MakeIter()
-	panicIfIteratorError(err, "make inverting slice iter")
-	return items
+func (s InvertingSlice) MakeIter() Iterator {
+	return NewInvertingShowtimeSliceIterator(s)
 }
 
 // Invert unrolls items and make inverting iterator based on them.
 func Invert(items Iterator) Iterator {
-	return MakeInvertingSliceIter(Unroll(items))
+	return InvertingSlice(Unroll(items)).MakeIter()
 }

@@ -87,16 +87,8 @@ type PrefixSlice []Type
 
 // MakeIter returns a new instance of PrefixIterator to iterate over it.
 // It returns EmptyPrefixIterator if the error is not nil.
-func (s PrefixSlice) MakeIter() (PrefixIterator, error) {
-	return NewShowtimePrefixSliceIterator(s), nil
-}
-
-// MakePrefixSliceIter it is shortcut for PrefixSlice.MakeIter since
-// it does not return an error.
-func MakePrefixSliceIter(slice []Type) PrefixIterator {
-	items, err := PrefixSlice(slice).MakeIter()
-	panicIfPrefixIteratorError(err, "make slice iter")
-	return items
+func (s PrefixSlice) MakeIter() PrefixIterator {
+	return NewShowtimePrefixSliceIterator(s)
 }
 
 // PrefixSlice is a slice of Type which can make inverting iterator.
@@ -104,19 +96,11 @@ type InvertingPrefixSlice []Type
 
 // MakeIter returns a new instance of PrefixIterator to iterate over it.
 // It returns EmptyPrefixIterator if the error is not nil.
-func (s InvertingPrefixSlice) MakeIter() (PrefixIterator, error) {
-	return NewInvertingShowtimePrefixSliceIterator(s), nil
-}
-
-// MakePrefixSliceIter it is shortcut for InvertingPrefixSlice.MakeIter since
-// it does not return an error.
-func MakeInvertingPrefixSliceIter(slice []Type) PrefixIterator {
-	items, err := InvertingPrefixSlice(slice).MakeIter()
-	panicIfPrefixIteratorError(err, "make inverting slice iter")
-	return items
+func (s InvertingPrefixSlice) MakeIter() PrefixIterator {
+	return NewInvertingShowtimePrefixSliceIterator(s)
 }
 
 // PrefixInvert unrolls items and make inverting iterator based on them.
 func PrefixInvert(items PrefixIterator) PrefixIterator {
-	return MakeInvertingPrefixSliceIter(PrefixUnroll(items))
+	return InvertingPrefixSlice(PrefixUnroll(items)).MakeIter()
 }

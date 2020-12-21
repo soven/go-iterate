@@ -26,22 +26,20 @@ var EmptyRuneIterator RuneIterator = emptyRuneIterator{}
 // RuneIterMaker is a maker of RuneIterator.
 type RuneIterMaker interface {
 	// MakeIter should return a new instance of RuneIterator to iterate over it.
-	// It is suggested to return EmptyRuneIterator if the error is not nil.
-	MakeIter() (RuneIterator, error)
+	MakeIter() RuneIterator
 }
 
 // MakeRuneIter is a shortcut implementation
 // of RuneIterator based on a function.
-type MakeRuneIter func() (RuneIterator, error)
+type MakeRuneIter func() RuneIterator
 
 // MakeIter returns a new instance of RuneIterator to iterate over it.
-// It returns EmptyRuneIterator if the error is not nil.
-func (m MakeRuneIter) MakeIter() (RuneIterator, error) { return m() }
+func (m MakeRuneIter) MakeIter() RuneIterator { return m() }
 
 // MakeNoRuneIter is a zero value for RuneIterMaker.
 // It always returns EmptyRuneIterator and an empty error.
 var MakeNoRuneIter RuneIterMaker = MakeRuneIter(
-	func() (RuneIterator, error) { return EmptyRuneIterator, nil })
+	func() RuneIterator { return EmptyRuneIterator })
 
 // RuneDiscard just range over all items and do nothing with each of them.
 func RuneDiscard(items RuneIterator) error {

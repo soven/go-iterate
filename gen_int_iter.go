@@ -26,22 +26,20 @@ var EmptyIntIterator IntIterator = emptyIntIterator{}
 // IntIterMaker is a maker of IntIterator.
 type IntIterMaker interface {
 	// MakeIter should return a new instance of IntIterator to iterate over it.
-	// It is suggested to return EmptyIntIterator if the error is not nil.
-	MakeIter() (IntIterator, error)
+	MakeIter() IntIterator
 }
 
 // MakeIntIter is a shortcut implementation
 // of IntIterator based on a function.
-type MakeIntIter func() (IntIterator, error)
+type MakeIntIter func() IntIterator
 
 // MakeIter returns a new instance of IntIterator to iterate over it.
-// It returns EmptyIntIterator if the error is not nil.
-func (m MakeIntIter) MakeIter() (IntIterator, error) { return m() }
+func (m MakeIntIter) MakeIter() IntIterator { return m() }
 
 // MakeNoIntIter is a zero value for IntIterMaker.
 // It always returns EmptyIntIterator and an empty error.
 var MakeNoIntIter IntIterMaker = MakeIntIter(
-	func() (IntIterator, error) { return EmptyIntIterator, nil })
+	func() IntIterator { return EmptyIntIterator })
 
 // IntDiscard just range over all items and do nothing with each of them.
 func IntDiscard(items IntIterator) error {

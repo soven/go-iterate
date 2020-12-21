@@ -26,22 +26,20 @@ var EmptyInt8Iterator Int8Iterator = emptyInt8Iterator{}
 // Int8IterMaker is a maker of Int8Iterator.
 type Int8IterMaker interface {
 	// MakeIter should return a new instance of Int8Iterator to iterate over it.
-	// It is suggested to return EmptyInt8Iterator if the error is not nil.
-	MakeIter() (Int8Iterator, error)
+	MakeIter() Int8Iterator
 }
 
 // MakeInt8Iter is a shortcut implementation
 // of Int8Iterator based on a function.
-type MakeInt8Iter func() (Int8Iterator, error)
+type MakeInt8Iter func() Int8Iterator
 
 // MakeIter returns a new instance of Int8Iterator to iterate over it.
-// It returns EmptyInt8Iterator if the error is not nil.
-func (m MakeInt8Iter) MakeIter() (Int8Iterator, error) { return m() }
+func (m MakeInt8Iter) MakeIter() Int8Iterator { return m() }
 
 // MakeNoInt8Iter is a zero value for Int8IterMaker.
 // It always returns EmptyInt8Iterator and an empty error.
 var MakeNoInt8Iter Int8IterMaker = MakeInt8Iter(
-	func() (Int8Iterator, error) { return EmptyInt8Iterator, nil })
+	func() Int8Iterator { return EmptyInt8Iterator })
 
 // Int8Discard just range over all items and do nothing with each of them.
 func Int8Discard(items Int8Iterator) error {

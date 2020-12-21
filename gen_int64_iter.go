@@ -26,22 +26,20 @@ var EmptyInt64Iterator Int64Iterator = emptyInt64Iterator{}
 // Int64IterMaker is a maker of Int64Iterator.
 type Int64IterMaker interface {
 	// MakeIter should return a new instance of Int64Iterator to iterate over it.
-	// It is suggested to return EmptyInt64Iterator if the error is not nil.
-	MakeIter() (Int64Iterator, error)
+	MakeIter() Int64Iterator
 }
 
 // MakeInt64Iter is a shortcut implementation
 // of Int64Iterator based on a function.
-type MakeInt64Iter func() (Int64Iterator, error)
+type MakeInt64Iter func() Int64Iterator
 
 // MakeIter returns a new instance of Int64Iterator to iterate over it.
-// It returns EmptyInt64Iterator if the error is not nil.
-func (m MakeInt64Iter) MakeIter() (Int64Iterator, error) { return m() }
+func (m MakeInt64Iter) MakeIter() Int64Iterator { return m() }
 
 // MakeNoInt64Iter is a zero value for Int64IterMaker.
 // It always returns EmptyInt64Iterator and an empty error.
 var MakeNoInt64Iter Int64IterMaker = MakeInt64Iter(
-	func() (Int64Iterator, error) { return EmptyInt64Iterator, nil })
+	func() Int64Iterator { return EmptyInt64Iterator })
 
 // Int64Discard just range over all items and do nothing with each of them.
 func Int64Discard(items Int64Iterator) error {

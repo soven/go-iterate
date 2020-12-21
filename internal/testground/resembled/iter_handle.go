@@ -1,6 +1,8 @@
 package resembled
 
-import "github.com/pkg/errors"
+import (
+	"github.com/pkg/errors"
+)
 
 // PrefixHandler is an object handling an item type of Type.
 type PrefixHandler interface {
@@ -89,6 +91,44 @@ func PrefixHandling(items PrefixIterator, handlers ...PrefixHandler) PrefixItera
 	}
 	return &HandlingPrefixIterator{
 		preparedPrefixItem{base: items}, PrefixHandlerSeries(handlers...)}
+}
+
+// PrefixRange iterates over items and use handlers to each one.
+func PrefixRange(items PrefixIterator, handlers ...PrefixHandler) error {
+	return PrefixDiscard(PrefixHandling(items, handlers...))
+}
+
+// PrefixRangeIterator is an iterator over items.
+type PrefixRangeIterator interface {
+	// Range should iterate over items.
+	Range(...PrefixHandler) error
+}
+
+type sPrefixRangeIterator struct {
+	iter PrefixIterator
+}
+
+// ToPrefixRangeIterator constructs an instance implementing PrefixRangeIterator
+// based on PrefixIterator.
+func ToPrefixRangeIterator(iter PrefixIterator) PrefixRangeIterator {
+	if iter == nil {
+		iter = EmptyPrefixIterator
+	}
+	return sPrefixRangeIterator{iter: iter}
+}
+
+// MakePrefixRangeIterator constructs an instance implementing PrefixRangeIterator
+// based on PrefixIterMaker.
+func MakePrefixRangeIterator(maker PrefixIterMaker) PrefixRangeIterator {
+	if maker == nil {
+		maker = MakeNoPrefixIter
+	}
+	return ToPrefixRangeIterator(maker.MakeIter())
+}
+
+// Range iterates over items.
+func (r sPrefixRangeIterator) Range(handlers ...PrefixHandler) error {
+	return PrefixRange(r.iter, handlers...)
 }
 
 // PrefixEnumHandler is an object handling an item type of Type and its ordered number.
@@ -180,4 +220,47 @@ func PrefixEnumHandling(items PrefixIterator, handlers ...PrefixEnumHandler) Pre
 	}
 	return &EnumHandlingPrefixIterator{
 		preparedPrefixItem{base: items}, PrefixEnumHandlerSeries(handlers...), 0}
+}
+
+// PrefixEnum iterates over items and their ordering numbers and use handlers to each one.
+func PrefixEnum(items PrefixIterator, handlers ...PrefixEnumHandler) error {
+	return PrefixDiscard(PrefixEnumHandling(items, handlers...))
+}
+
+// PrefixEnumIterator is an iterator over items and their ordering numbers.
+type PrefixEnumIterator interface {
+	// Enum should iterate over items and their ordering numbers.
+	Enum(...PrefixEnumHandler) error
+}
+
+type sPrefixEnumIterator struct {
+	iter PrefixIterator
+}
+
+// ToPrefixEnumIterator constructs an instance implementing PrefixEnumIterator
+// based on PrefixIterator.
+func ToPrefixEnumIterator(iter PrefixIterator) PrefixEnumIterator {
+	if iter == nil {
+		iter = EmptyPrefixIterator
+	}
+	return sPrefixEnumIterator{iter: iter}
+}
+
+// MakePrefixEnumIterator constructs an instance implementing PrefixEnumIterator
+// based on PrefixIterMaker.
+func MakePrefixEnumIterator(maker PrefixIterMaker) PrefixEnumIterator {
+	if maker == nil {
+		maker = MakeNoPrefixIter
+	}
+	return ToPrefixEnumIterator(maker.MakeIter())
+}
+
+// Enum iterates over items and their ordering numbers.
+func (r sPrefixEnumIterator) Enum(handlers ...PrefixEnumHandler) error {
+	return PrefixEnum(r.iter, handlers...)
+}
+
+// Range iterates over items.
+func (r sPrefixEnumIterator) Range(handlers ...PrefixHandler) error {
+	return PrefixRange(r.iter, handlers...)
 }

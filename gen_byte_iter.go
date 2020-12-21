@@ -26,22 +26,20 @@ var EmptyByteIterator ByteIterator = emptyByteIterator{}
 // ByteIterMaker is a maker of ByteIterator.
 type ByteIterMaker interface {
 	// MakeIter should return a new instance of ByteIterator to iterate over it.
-	// It is suggested to return EmptyByteIterator if the error is not nil.
-	MakeIter() (ByteIterator, error)
+	MakeIter() ByteIterator
 }
 
 // MakeByteIter is a shortcut implementation
 // of ByteIterator based on a function.
-type MakeByteIter func() (ByteIterator, error)
+type MakeByteIter func() ByteIterator
 
 // MakeIter returns a new instance of ByteIterator to iterate over it.
-// It returns EmptyByteIterator if the error is not nil.
-func (m MakeByteIter) MakeIter() (ByteIterator, error) { return m() }
+func (m MakeByteIter) MakeIter() ByteIterator { return m() }
 
 // MakeNoByteIter is a zero value for ByteIterMaker.
 // It always returns EmptyByteIterator and an empty error.
 var MakeNoByteIter ByteIterMaker = MakeByteIter(
-	func() (ByteIterator, error) { return EmptyByteIterator, nil })
+	func() ByteIterator { return EmptyByteIterator })
 
 // ByteDiscard just range over all items and do nothing with each of them.
 func ByteDiscard(items ByteIterator) error {

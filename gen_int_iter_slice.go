@@ -88,16 +88,8 @@ type IntSlice []int
 
 // MakeIter returns a new instance of IntIterator to iterate over it.
 // It returns EmptyIntIterator if the error is not nil.
-func (s IntSlice) MakeIter() (IntIterator, error) {
-	return NewShowtimeIntSliceIterator(s), nil
-}
-
-// MakeIntSliceIter it is shortcut for IntSlice.MakeIter since
-// it does not return an error.
-func MakeIntSliceIter(slice []int) IntIterator {
-	items, err := IntSlice(slice).MakeIter()
-	panicIfIntIteratorError(err, "make slice iter")
-	return items
+func (s IntSlice) MakeIter() IntIterator {
+	return NewShowtimeIntSliceIterator(s)
 }
 
 // IntSlice is a slice of int which can make inverting iterator.
@@ -105,19 +97,11 @@ type InvertingIntSlice []int
 
 // MakeIter returns a new instance of IntIterator to iterate over it.
 // It returns EmptyIntIterator if the error is not nil.
-func (s InvertingIntSlice) MakeIter() (IntIterator, error) {
-	return NewInvertingShowtimeIntSliceIterator(s), nil
-}
-
-// MakeIntSliceIter it is shortcut for InvertingIntSlice.MakeIter since
-// it does not return an error.
-func MakeInvertingIntSliceIter(slice []int) IntIterator {
-	items, err := InvertingIntSlice(slice).MakeIter()
-	panicIfIntIteratorError(err, "make inverting slice iter")
-	return items
+func (s InvertingIntSlice) MakeIter() IntIterator {
+	return NewInvertingShowtimeIntSliceIterator(s)
 }
 
 // IntInvert unrolls items and make inverting iterator based on them.
 func IntInvert(items IntIterator) IntIterator {
-	return MakeInvertingIntSliceIter(IntUnroll(items))
+	return InvertingIntSlice(IntUnroll(items)).MakeIter()
 }

@@ -88,16 +88,8 @@ type {{ .TitlePrefix }}Slice []{{ .TypeName }}
 
 // MakeIter returns a new instance of {{ .TitlePrefix }}Iterator to iterate over it.
 // It returns Empty{{ .TitlePrefix }}Iterator if the error is not nil.
-func (s {{ .TitlePrefix }}Slice) MakeIter() ({{ .TitlePrefix }}Iterator, error) {
-	return NewShowtime{{ .TitlePrefix }}SliceIterator(s), nil
-}
-
-// Make{{ .TitlePrefix }}SliceIter it is shortcut for {{ .TitlePrefix }}Slice.MakeIter since
-// it does not return an error.
-func Make{{ .TitlePrefix }}SliceIter(slice []{{ .TypeName }}) {{ .TitlePrefix }}Iterator {
-	items, err := {{ .TitlePrefix }}Slice(slice).MakeIter()
-	panicIf{{ .TitlePrefix }}IteratorError(err, "make slice iter")
-	return items
+func (s {{ .TitlePrefix }}Slice) MakeIter() {{ .TitlePrefix }}Iterator {
+	return NewShowtime{{ .TitlePrefix }}SliceIterator(s)
 }
 
 // {{ .TitlePrefix }}Slice is a slice of {{ .TypeName }} which can make inverting iterator.
@@ -105,19 +97,11 @@ type Inverting{{ .TitlePrefix }}Slice []{{ .TypeName }}
 
 // MakeIter returns a new instance of {{ .TitlePrefix }}Iterator to iterate over it.
 // It returns Empty{{ .TitlePrefix }}Iterator if the error is not nil.
-func (s Inverting{{ .TitlePrefix }}Slice) MakeIter() ({{ .TitlePrefix }}Iterator, error) {
-	return NewInvertingShowtime{{ .TitlePrefix }}SliceIterator(s), nil
-}
-
-// Make{{ .TitlePrefix }}SliceIter it is shortcut for Inverting{{ .TitlePrefix }}Slice.MakeIter since
-// it does not return an error.
-func MakeInverting{{ .TitlePrefix }}SliceIter(slice []{{ .TypeName }}) {{ .TitlePrefix }}Iterator {
-	items, err := Inverting{{ .TitlePrefix }}Slice(slice).MakeIter()
-	panicIf{{ .TitlePrefix }}IteratorError(err, "make inverting slice iter")
-	return items
+func (s Inverting{{ .TitlePrefix }}Slice) MakeIter() {{ .TitlePrefix }}Iterator {
+	return NewInvertingShowtime{{ .TitlePrefix }}SliceIterator(s)
 }
 
 // {{ .TitlePrefix }}Invert unrolls items and make inverting iterator based on them.
 func {{ .TitlePrefix }}Invert(items {{ .TitlePrefix }}Iterator) {{ .TitlePrefix }}Iterator {
-	return MakeInverting{{ .TitlePrefix }}SliceIter({{ .TitlePrefix }}Unroll(items))
+	return Inverting{{ .TitlePrefix }}Slice({{ .TitlePrefix }}Unroll(items)).MakeIter()
 }

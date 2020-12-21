@@ -26,22 +26,20 @@ var EmptyUint32Iterator Uint32Iterator = emptyUint32Iterator{}
 // Uint32IterMaker is a maker of Uint32Iterator.
 type Uint32IterMaker interface {
 	// MakeIter should return a new instance of Uint32Iterator to iterate over it.
-	// It is suggested to return EmptyUint32Iterator if the error is not nil.
-	MakeIter() (Uint32Iterator, error)
+	MakeIter() Uint32Iterator
 }
 
 // MakeUint32Iter is a shortcut implementation
 // of Uint32Iterator based on a function.
-type MakeUint32Iter func() (Uint32Iterator, error)
+type MakeUint32Iter func() Uint32Iterator
 
 // MakeIter returns a new instance of Uint32Iterator to iterate over it.
-// It returns EmptyUint32Iterator if the error is not nil.
-func (m MakeUint32Iter) MakeIter() (Uint32Iterator, error) { return m() }
+func (m MakeUint32Iter) MakeIter() Uint32Iterator { return m() }
 
 // MakeNoUint32Iter is a zero value for Uint32IterMaker.
 // It always returns EmptyUint32Iterator and an empty error.
 var MakeNoUint32Iter Uint32IterMaker = MakeUint32Iter(
-	func() (Uint32Iterator, error) { return EmptyUint32Iterator, nil })
+	func() Uint32Iterator { return EmptyUint32Iterator })
 
 // Uint32Discard just range over all items and do nothing with each of them.
 func Uint32Discard(items Uint32Iterator) error {

@@ -25,22 +25,20 @@ var EmptyPrefixIterator PrefixIterator = emptyPrefixIterator{}
 // PrefixIterMaker is a maker of PrefixIterator.
 type PrefixIterMaker interface {
 	// MakeIter should return a new instance of PrefixIterator to iterate over it.
-	// It is suggested to return EmptyPrefixIterator if the error is not nil.
-	MakeIter() (PrefixIterator, error)
+	MakeIter() PrefixIterator
 }
 
 // MakePrefixIter is a shortcut implementation
 // of PrefixIterator based on a function.
-type MakePrefixIter func() (PrefixIterator, error)
+type MakePrefixIter func() PrefixIterator
 
 // MakeIter returns a new instance of PrefixIterator to iterate over it.
-// It returns EmptyPrefixIterator if the error is not nil.
-func (m MakePrefixIter) MakeIter() (PrefixIterator, error) { return m() }
+func (m MakePrefixIter) MakeIter() PrefixIterator { return m() }
 
 // MakeNoPrefixIter is a zero value for PrefixIterMaker.
 // It always returns EmptyPrefixIterator and an empty error.
 var MakeNoPrefixIter PrefixIterMaker = MakePrefixIter(
-	func() (PrefixIterator, error) { return EmptyPrefixIterator, nil })
+	func() PrefixIterator { return EmptyPrefixIterator })
 
 // PrefixDiscard just range over all items and do nothing with each of them.
 func PrefixDiscard(items PrefixIterator) error {

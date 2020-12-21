@@ -122,7 +122,8 @@ func (g *AsIsGenerator) AssembleTemplate(templateDir string, ctx app.ToMacroRepl
 
 	_, err = replacer.WriteString(fh, string(g.sourceCode))
 	if err != nil {
-		return nil, fmt.Errorf("replace with writing to %s: %w", err)
+		return nil, fmt.Errorf("replace with writing to %s: %w",
+			targetFilePath, err)
 	}
 
 	return []string{targetFilePath}, nil

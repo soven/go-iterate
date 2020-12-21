@@ -26,22 +26,20 @@ var EmptyUintIterator UintIterator = emptyUintIterator{}
 // UintIterMaker is a maker of UintIterator.
 type UintIterMaker interface {
 	// MakeIter should return a new instance of UintIterator to iterate over it.
-	// It is suggested to return EmptyUintIterator if the error is not nil.
-	MakeIter() (UintIterator, error)
+	MakeIter() UintIterator
 }
 
 // MakeUintIter is a shortcut implementation
 // of UintIterator based on a function.
-type MakeUintIter func() (UintIterator, error)
+type MakeUintIter func() UintIterator
 
 // MakeIter returns a new instance of UintIterator to iterate over it.
-// It returns EmptyUintIterator if the error is not nil.
-func (m MakeUintIter) MakeIter() (UintIterator, error) { return m() }
+func (m MakeUintIter) MakeIter() UintIterator { return m() }
 
 // MakeNoUintIter is a zero value for UintIterMaker.
 // It always returns EmptyUintIterator and an empty error.
 var MakeNoUintIter UintIterMaker = MakeUintIter(
-	func() (UintIterator, error) { return EmptyUintIterator, nil })
+	func() UintIterator { return EmptyUintIterator })
 
 // UintDiscard just range over all items and do nothing with each of them.
 func UintDiscard(items UintIterator) error {

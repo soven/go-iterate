@@ -1,6 +1,7 @@
 package resembled_test
 
 import (
+	"github.com/stretchr/testify/mock"
 	"testing"
 
 	"github.com/soven/go-iterate/internal/testground/resembled"
@@ -50,7 +51,7 @@ func Test_AlwaysPrefixCheckFalse(t *testing.T) {
 	}
 }
 
-func mockPrefixChecker(val resembled.Type, ret ...interface{}) resembled.PrefixChecker {
+func mockPrefixChecker(val interface{}, ret ...interface{}) resembled.PrefixChecker {
 	m := &mocks.PrefixChecker{}
 	m.
 		On("Check", val).Return(ret...)
@@ -294,12 +295,14 @@ func Test_PrefixFiltering(t *testing.T) {
 			name: "general",
 			iter: mockPrefixIterator(1, 2, 3),
 			checkers: []resembled.PrefixChecker{
-				resembled.PrefixCheck(func(val resembled.Type) (bool, error) {
-					return val.(int) >= 2, nil
-				}),
-				resembled.PrefixCheck(func(val resembled.Type) (bool, error) {
-					return val.(int)%2 == 0, nil
-				}),
+				mockPrefixChecker(mock.Anything,
+					func(val resembled.Type) bool { return val.(int) >= 2 },
+					func(_ resembled.Type) error { return nil },
+				),
+				mockPrefixChecker(mock.Anything,
+					func(val resembled.Type) bool { return val.(int)%2 == 0 },
+					func(_ resembled.Type) error { return nil },
+				),
 			},
 			want: []resembled.Type{2},
 		},
@@ -347,9 +350,10 @@ func Test_PrefixDoingUntil(t *testing.T) {
 			name: "general",
 			iter: mockPrefixIterator(1, 2, 3, 5, 8),
 			checkers: []resembled.PrefixChecker{
-				resembled.PrefixCheck(func(val resembled.Type) (bool, error) {
-					return val.(int) == 3, nil
-				}),
+				mockPrefixChecker(mock.Anything,
+					func(val resembled.Type) bool { return val.(int) == 3 },
+					func(_ resembled.Type) error { return nil },
+				),
 			},
 			want: [][]resembled.Type{
 				{1, 2, 3},
@@ -406,9 +410,10 @@ func Test_PrefixSkipUntil(t *testing.T) {
 			name: "general",
 			iter: mockPrefixIterator(1, 2, 3, 5, 8),
 			checkers: []resembled.PrefixChecker{
-				resembled.PrefixCheck(func(val resembled.Type) (bool, error) {
-					return val.(int) == 3, nil
-				}),
+				mockPrefixChecker(mock.Anything,
+					func(val resembled.Type) bool { return val.(int) == 3 },
+					func(_ resembled.Type) error { return nil },
+				),
 			},
 			want: []resembled.Type{5, 8},
 		},
@@ -526,7 +531,7 @@ func Test_AlwaysPrefixEnumCheckFalse(t *testing.T) {
 	}
 }
 
-func mockPrefixEnumChecker(n int, val resembled.Type, ret ...interface{}) resembled.PrefixEnumChecker {
+func mockPrefixEnumChecker(n, val interface{}, ret ...interface{}) resembled.PrefixEnumChecker {
 	m := &mocks.PrefixEnumChecker{}
 	m.
 		On("Check", n, val).Return(ret...)
@@ -716,16 +721,19 @@ func Test_PrefixEnumFiltering(t *testing.T) {
 			checkers: []resembled.PrefixEnumChecker{
 				resembled.EnumAnyPrefix(
 					resembled.EnumAllPrefix(
-						resembled.PrefixEnumCheck(func(_ int, val resembled.Type) (bool, error) {
-							return val.(int) >= 3, nil
-						}),
-						resembled.PrefixEnumCheck(func(_ int, val resembled.Type) (bool, error) {
-							return val.(int)%2 == 0, nil
-						}),
+						mockPrefixEnumChecker(mock.Anything, mock.Anything,
+							func(_ int, val resembled.Type) bool { return val.(int) >= 3 },
+							func(_ int, _ resembled.Type) error { return nil },
+						),
+						mockPrefixEnumChecker(mock.Anything, mock.Anything,
+							func(_ int, val resembled.Type) bool { return val.(int)%2 == 0 },
+							func(_ int, _ resembled.Type) error { return nil },
+						),
 					),
-					resembled.PrefixEnumCheck(func(n int, _ resembled.Type) (bool, error) {
-						return n%2 == 1, nil
-					}),
+					mockPrefixEnumChecker(mock.Anything, mock.Anything,
+						func(n int, _ resembled.Type) bool { return n%2 == 1 },
+						func(_ int, _ resembled.Type) error { return nil },
+					),
 				),
 			},
 			want: []resembled.Type{2, 5, 8},
@@ -774,9 +782,10 @@ func Test_PrefixEnumDoingUntil(t *testing.T) {
 			name: "general",
 			iter: mockPrefixIterator(1, 2, 3, 5, 8),
 			checkers: []resembled.PrefixEnumChecker{
-				resembled.PrefixEnumCheck(func(n int, val resembled.Type) (bool, error) {
-					return n == 2 && val.(int) == 3, nil
-				}),
+				mockPrefixEnumChecker(mock.Anything, mock.Anything,
+					func(n int, val resembled.Type) bool { return n == 2 && val.(int) == 3 },
+					func(_ int, _ resembled.Type) error { return nil },
+				),
 			},
 			want: [][]resembled.Type{
 				{1, 2, 3},
@@ -833,9 +842,10 @@ func Test_PrefixEnumSkipUntil(t *testing.T) {
 			name: "general",
 			iter: mockPrefixIterator(1, 2, 3, 5, 8),
 			checkers: []resembled.PrefixEnumChecker{
-				resembled.PrefixEnumCheck(func(n int, val resembled.Type) (bool, error) {
-					return n == 2 && val.(int) == 3, nil
-				}),
+				mockPrefixEnumChecker(mock.Anything, mock.Anything,
+					func(n int, val resembled.Type) bool { return n == 2 && val.(int) == 3 },
+					func(_ int, _ resembled.Type) error { return nil },
+				),
 			},
 			want: []resembled.Type{5, 8},
 		},

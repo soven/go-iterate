@@ -26,22 +26,20 @@ var EmptyInt32Iterator Int32Iterator = emptyInt32Iterator{}
 // Int32IterMaker is a maker of Int32Iterator.
 type Int32IterMaker interface {
 	// MakeIter should return a new instance of Int32Iterator to iterate over it.
-	// It is suggested to return EmptyInt32Iterator if the error is not nil.
-	MakeIter() (Int32Iterator, error)
+	MakeIter() Int32Iterator
 }
 
 // MakeInt32Iter is a shortcut implementation
 // of Int32Iterator based on a function.
-type MakeInt32Iter func() (Int32Iterator, error)
+type MakeInt32Iter func() Int32Iterator
 
 // MakeIter returns a new instance of Int32Iterator to iterate over it.
-// It returns EmptyInt32Iterator if the error is not nil.
-func (m MakeInt32Iter) MakeIter() (Int32Iterator, error) { return m() }
+func (m MakeInt32Iter) MakeIter() Int32Iterator { return m() }
 
 // MakeNoInt32Iter is a zero value for Int32IterMaker.
 // It always returns EmptyInt32Iterator and an empty error.
 var MakeNoInt32Iter Int32IterMaker = MakeInt32Iter(
-	func() (Int32Iterator, error) { return EmptyInt32Iterator, nil })
+	func() Int32Iterator { return EmptyInt32Iterator })
 
 // Int32Discard just range over all items and do nothing with each of them.
 func Int32Discard(items Int32Iterator) error {
