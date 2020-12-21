@@ -65,9 +65,9 @@ func run() error {
 func handleTemplatePath(source string) string {
 	const prodPrefixPath = "$GOPATH/src/github.com/soven/go-iterate"
 	if isDevEnv {
-		return filepath.Join(prodPrefixPath, source)
+		return source
 	}
-	return source
+	return filepath.Join(prodPrefixPath, source)
 }
 
 func main() {
