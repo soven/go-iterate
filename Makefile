@@ -17,7 +17,7 @@ ASSEMBLE_TEMPLATES_ZERO_FROM := Zero
 ASSEMBLE_TEMPLATES_PREFIX_FROM := Prefix
 
 install:
-	$(GOBIN) install -ldflags="-X 'main.Version=$(VERSION) main.PackageDir=$(CURDIR)'" "$(INSTALL_GEN_ITER_KIT_CMD)"
+	$(GOBIN) install -ldflags="-X 'main.Version=$(VERSION)' -X 'main.PackageDir=$(CURDIR)'" "$(INSTALL_GEN_ITER_KIT_CMD)"
 
 kit:
 ifdef GOBIN

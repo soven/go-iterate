@@ -2,26 +2,22 @@ package main
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/soven/go-iterate/internal/app"
-	"github.com/soven/go-iterate/internal/app/multiple"
-	formatting "github.com/soven/go-iterate/internal/app/with_formatting"
-	"github.com/soven/go-iterate/internal/app/with_preparing"
-	"github.com/soven/go-iterate/internal/app/with_validating"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/pkg/errors"
+
+	"github.com/soven/go-iterate/internal/app"
 	"github.com/soven/go-iterate/internal/app/go_text_templates"
+	"github.com/soven/go-iterate/internal/app/multiple"
+	"github.com/soven/go-iterate/internal/app/with_adding"
+	"github.com/soven/go-iterate/internal/app/with_formatting"
+	"github.com/soven/go-iterate/internal/app/with_preparing"
+	"github.com/soven/go-iterate/internal/app/with_validating"
 	"github.com/soven/go-iterate/internal/cli"
 )
-
-var isDevEnv bool
-
-func init() {
-	isDevEnv = strings.ToLower(os.Getenv("ENV")) == "dev"
-}
 
 var allTemplatePaths = []string{
 	"templates/iter.go.tmpl",
@@ -32,6 +28,8 @@ var allTemplatePaths = []string{
 	"templates/iter_slice.go.tmpl",
 	"templates/iter_util.go.tmpl",
 }
+
+var isDevEnv = strings.ToLower(os.Getenv("ENV")) == "dev"
 
 var (
 	Version    = "v0.0.0"
@@ -51,11 +49,15 @@ func run() error {
 			go_text_templates.MakeAsIsGenerator(handleTemplatePath(templatePath)))
 	}
 
-	controller := cli.NewIterGenerator(
-		formatting.WithFormatting(
-			preparing.WithBaseGenIterPreparation(
-				validating.WithBaseGenIterValidation(
-					multiple.IterGenerators(templateGenerators...)))))
+	var iterGen app.IterGenerator = preparing.WithBaseGenIterPreparation(
+		validating.WithBaseGenIterValidation(
+			multiple.IterGenerators(templateGenerators...)))
+
+	if !isDevEnv {
+		iterGen = adding.WithNoEditPrefixAdding(iterGen)
+	}
+
+	controller := cli.NewIterGenerator(formatting.WithFormatting(iterGen))
 	err := controller.GenIter()
 	if err != nil {
 		return errors.Wrap(err, "controller gen iter")

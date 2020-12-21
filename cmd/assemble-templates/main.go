@@ -1,14 +1,13 @@
 package main
 
 import (
-	"github.com/soven/go-iterate/internal/app/multiple"
 	"log"
 
 	"github.com/pkg/errors"
 
 	"github.com/soven/go-iterate/internal/app"
 	"github.com/soven/go-iterate/internal/app/go_replacer_assembler"
-	"github.com/soven/go-iterate/internal/app/with_adding"
+	"github.com/soven/go-iterate/internal/app/multiple"
 	"github.com/soven/go-iterate/internal/cli"
 )
 
@@ -30,8 +29,7 @@ func run() error {
 	}
 
 	controller := cli.NewTemplateAssembler(
-		with_adding.WithNoEditPrefixAdding(
-			multiple.TemplateAssemblers(templateGenerators...)))
+		multiple.TemplateAssemblers(templateGenerators...))
 	err := controller.AssembleTemplate()
 	if err != nil {
 		return errors.Wrap(err, "controller assemble template")
