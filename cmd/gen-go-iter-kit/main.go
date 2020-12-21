@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/soven/go-iterate/internal/app"
 	"github.com/soven/go-iterate/internal/app/multiple"
 	formatting "github.com/soven/go-iterate/internal/app/with_formatting"
@@ -11,8 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/pkg/errors"
 
 	"github.com/soven/go-iterate/internal/app/go_text_templates"
 	"github.com/soven/go-iterate/internal/cli"
@@ -34,7 +33,10 @@ var allTemplatePaths = []string{
 	"templates/iter_util.go.tmpl",
 }
 
-var Version = "v0.0.0"
+var (
+	Version    = "v0.0.0"
+	PackageDir = "."
+)
 
 func run() error {
 	const versionFlag = "version"
@@ -63,11 +65,10 @@ func run() error {
 }
 
 func handleTemplatePath(source string) string {
-	const prodPrefixPath = "$GOPATH/src/github.com/soven/go-iterate"
 	if isDevEnv {
 		return source
 	}
-	return filepath.Join(prodPrefixPath, source)
+	return filepath.Join(PackageDir, source)
 }
 
 func main() {

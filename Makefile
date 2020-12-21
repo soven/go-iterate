@@ -17,7 +17,7 @@ ASSEMBLE_TEMPLATES_ZERO_FROM := Zero
 ASSEMBLE_TEMPLATES_PREFIX_FROM := Prefix
 
 install:
-	$(GOBIN) install -ldflags="-X 'main.Version=$(VERSION)'" "$(INSTALL_GEN_ITER_KIT_CMD)"
+	$(GOBIN) install -ldflags="-X 'main.Version=$(VERSION) main.PackageDir=$(CURDIR)'" "$(INSTALL_GEN_ITER_KIT_CMD)"
 
 kit:
 ifdef GOBIN
@@ -26,10 +26,10 @@ ifdef TYPE
 ifdef PACKAGE
 ifdef ZERO
 ifdef PREFIX
-	$(GOBIN) run $(GEN_ITER_KIT_CMD) \
+	ENV=dev $(GOBIN) run $(GEN_ITER_KIT_CMD) \
 	-target $(TYPE) -package $(PACKAGE) -prefix $(PREFIX) -path $(PATH) -zero $(ZERO)
 else
-	$(GOBIN) run $(GEN_ITER_KIT_CMD) \
+	ENV=dev $(GOBIN) run $(GEN_ITER_KIT_CMD) \
 	-target $(TYPE) -package $(PACKAGE) -path $(PATH) -zero $(ZERO)
 endif
 else
@@ -55,9 +55,9 @@ clean:
 gen_kit_all: clean
 	while IFS=, read -r typ title zero pkg; do \
   		if [ -z "$$title" ]; then \
-  			$(GOBIN) run $(GEN_ITER_KIT_CMD) -target $$typ -zero $$zero -package $$pkg; \
+  			ENV=dev $(GOBIN) run $(GEN_ITER_KIT_CMD) -target $$typ -zero $$zero -package $$pkg; \
   		else \
-  			$(GOBIN) run $(GEN_ITER_KIT_CMD) -target $$typ -prefix $$title -zero $$zero -package $$pkg; \
+  			ENV=dev $(GOBIN) run $(GEN_ITER_KIT_CMD) -target $$typ -prefix $$title -zero $$zero -package $$pkg; \
   		fi; \
   	done < pre_gen_context.csv
 .PHONY: gen_kit_all
