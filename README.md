@@ -1,10 +1,38 @@
 # Go iterate!
 
 The package is a library to work with iterators.
-It contains primitive implementations to iterate over the embedded language types.
+It contains primitive implementations to iterate over the language embedded types.
+
 Also, it allows to generate an iterator kit for your custom types.
 
-### Usage
+### Install 
+
+```shell
+go get "github.com/soven/go-iterate"
+cd $GOPATH/src/github.com/soven/go-iterate
+make install
+
+# Make sure $GOPATH/bin in your $PATH
+gen-go-iter-kit version
+# Gen Go Iter KIT v0.0.1-beta
+```
+
+### The kit generator usage
+```shell
+# Put your custom type configuration in place of the next macros (angle bracket inclusive):
+# <type_name> - name of your type as is.
+# <prefix_name> - prefix for your type in generated identifier names. 
+#    Usually that is the same as <type_name> but capitalized.
+# <zero_type_value> - zero value of your type. 
+#    For example 0 is zero value for int, "" is zero value for string.
+#    You should pre define a zero value for your type as well.
+# <package_name> - package name which should be like the package of your type.
+# <path_to_package> - path to the package dir.
+gen-go-iter-kit -target="<type_name>" -prefix="<prefix_name>" \
+  -zero="<zero_type_value>" -package="<package_name>" -path="<path_to_package>"
+```
+
+### The library usage
 
 ```go
 package main

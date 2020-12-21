@@ -1,17 +1,23 @@
 GOCMD := "go"
 GOBIN := $(shell command -v $(GOCMD) 2> /dev/null)
+GEN_ITER_KIT_CMD_PATH := cmd/gen-go-iter-kit
 CURDIR := $(shell pwd)
+VERSION := v0.0.1-beta
 MOCKERYCMD := "mockery"
 MOCKERYBIN := $(shell command -v $(MOCKERYCMD) 2> /dev/null)
 MOCK_SOURCE_DIR := $(CURDIR)/internal/testground/resembled
 MOCKS_DIR := $(MOCK_SOURCE_DIR)/mocks
-GEN_ITER_KIT_CMD := $(CURDIR)/cmd/gen-go-iter-kit/main.go
+INSTALL_GEN_ITER_KIT_CMD := $(CURDIR)/$(GEN_ITER_KIT_CMD_PATH)
+GEN_ITER_KIT_CMD := $(CURDIR)/$(GEN_ITER_KIT_CMD_PATH)/main.go
 ASSEMBLE_TEMPLATES_CMD := $(CURDIR)/cmd/assemble-templates/main.go
 ASSEMBLE_TEMPLATES_PATH := templates
 ASSEMBLE_TEMPLATES_TYPE_FROM := Type
 ASSEMBLE_TEMPLATES_PACKAGE_FROM := resembled
 ASSEMBLE_TEMPLATES_ZERO_FROM := Zero
 ASSEMBLE_TEMPLATES_PREFIX_FROM := Prefix
+
+install:
+	$(GOBIN) install -ldflags="-X 'main.Version=$(VERSION)'" "$(INSTALL_GEN_ITER_KIT_CMD)"
 
 kit:
 ifdef GOBIN
