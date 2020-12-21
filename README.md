@@ -17,7 +17,7 @@ make install
 
 # Make sure $GOPATH/bin in your $PATH
 gen-go-iter-kit version
-# Gen Go Iter KIT v0.0.1-beta
+# Gen Go Iter KIT v0.0-beta
 ```
 
 ### The kit generator usage
