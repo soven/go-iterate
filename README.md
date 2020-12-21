@@ -1,5 +1,8 @@
 # Go iterate!
 
+[![GoDev](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white&style=flat-square)](https://pkg.go.dev/github.com/soven/go-iterate#section-documentation)
+
+
 The package is a library to work with iterators.
 It contains primitive implementations to iterate over the language embedded types.
 

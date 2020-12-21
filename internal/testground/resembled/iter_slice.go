@@ -71,7 +71,7 @@ func (it *InvertingPrefixSliceIterator) Next() Type {
 // Err contains first met error while Next.
 func (InvertingPrefixSliceIterator) Err() error { return nil }
 
-// PrefixUnroll unrolls items ot slice of Type.
+// PrefixUnroll unrolls items to slice of Type.
 func PrefixUnroll(items PrefixIterator) PrefixSlice {
 	var slice PrefixSlice
 	panicIfPrefixIteratorError(PrefixDiscard(PrefixHandling(items, PrefixHandle(func(item Type) error {
