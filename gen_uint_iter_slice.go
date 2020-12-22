@@ -6,10 +6,10 @@ type UintSliceIterator struct {
 	cur   int
 }
 
-// NewShowtimeUintSliceIterator returns a new instance of UintSliceIterator.
+// NewUintSliceIterator returns a new instance of UintSliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use UintUnroll(slice).MakeIter() instead of to iterate over copies of item in the items.
-func NewShowtimeUintSliceIterator(slice []uint) *UintSliceIterator {
+func NewUintSliceIterator(slice []uint) *UintSliceIterator {
 	it := &UintSliceIterator{slice: slice}
 	return it
 }
@@ -42,10 +42,10 @@ type InvertingUintSliceIterator struct {
 	cur   int
 }
 
-// NewInvertingShowtimeUintSliceIterator returns a new instance of InvertingUintSliceIterator.
+// NewInvertingUintSliceIterator returns a new instance of InvertingUintSliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use InvertingUintSlice(UintUnroll(slice)).MakeIter() instead of to iterate over copies of item in the items.
-func NewInvertingShowtimeUintSliceIterator(slice []uint) *InvertingUintSliceIterator {
+func NewInvertingUintSliceIterator(slice []uint) *InvertingUintSliceIterator {
 	it := &InvertingUintSliceIterator{slice: slice, cur: len(slice) - 1}
 	return it
 }
@@ -71,7 +71,7 @@ func (it *InvertingUintSliceIterator) Next() uint {
 // Err contains first met error while Next.
 func (InvertingUintSliceIterator) Err() error { return nil }
 
-// UintUnroll unrolls items ot slice of uint.
+// UintUnroll unrolls items to slice of uint.
 func UintUnroll(items UintIterator) UintSlice {
 	var slice UintSlice
 	panicIfUintIteratorError(UintDiscard(UintHandling(items, UintHandle(func(item uint) error {
@@ -88,7 +88,7 @@ type UintSlice []uint
 // MakeIter returns a new instance of UintIterator to iterate over it.
 // It returns EmptyUintIterator if the error is not nil.
 func (s UintSlice) MakeIter() UintIterator {
-	return NewShowtimeUintSliceIterator(s)
+	return NewUintSliceIterator(s)
 }
 
 // UintSlice is a slice of uint which can make inverting iterator.
@@ -97,7 +97,7 @@ type InvertingUintSlice []uint
 // MakeIter returns a new instance of UintIterator to iterate over it.
 // It returns EmptyUintIterator if the error is not nil.
 func (s InvertingUintSlice) MakeIter() UintIterator {
-	return NewInvertingShowtimeUintSliceIterator(s)
+	return NewInvertingUintSliceIterator(s)
 }
 
 // UintInvert unrolls items and make inverting iterator based on them.

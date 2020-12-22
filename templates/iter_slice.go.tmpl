@@ -6,10 +6,10 @@ type {{ .TitlePrefix }}SliceIterator struct {
 	cur   int
 }
 
-// NewShowtime{{ .TitlePrefix }}SliceIterator returns a new instance of {{ .TitlePrefix }}SliceIterator.
+// New{{ .TitlePrefix }}SliceIterator returns a new instance of {{ .TitlePrefix }}SliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use {{ .TitlePrefix }}Unroll(slice).MakeIter() instead of to iterate over copies of item in the items.
-func NewShowtime{{ .TitlePrefix }}SliceIterator(slice []{{ .TypeName }}) *{{ .TitlePrefix }}SliceIterator {
+func New{{ .TitlePrefix }}SliceIterator(slice []{{ .TypeName }}) *{{ .TitlePrefix }}SliceIterator {
 	it := &{{ .TitlePrefix }}SliceIterator{slice: slice}
 	return it
 }
@@ -42,10 +42,10 @@ type Inverting{{ .TitlePrefix }}SliceIterator struct {
 	cur   int
 }
 
-// NewInvertingShowtime{{ .TitlePrefix }}SliceIterator returns a new instance of Inverting{{ .TitlePrefix }}SliceIterator.
+// NewInverting{{ .TitlePrefix }}SliceIterator returns a new instance of Inverting{{ .TitlePrefix }}SliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use Inverting{{ .TitlePrefix }}Slice({{ .TitlePrefix }}Unroll(slice)).MakeIter() instead of to iterate over copies of item in the items.
-func NewInvertingShowtime{{ .TitlePrefix }}SliceIterator(slice []{{ .TypeName }}) *Inverting{{ .TitlePrefix }}SliceIterator {
+func NewInverting{{ .TitlePrefix }}SliceIterator(slice []{{ .TypeName }}) *Inverting{{ .TitlePrefix }}SliceIterator {
 	it := &Inverting{{ .TitlePrefix }}SliceIterator{slice: slice, cur: len(slice) - 1}
 	return it
 }
@@ -71,7 +71,7 @@ func (it *Inverting{{ .TitlePrefix }}SliceIterator) Next() {{ .TypeName }} {
 // Err contains first met error while Next.
 func (Inverting{{ .TitlePrefix }}SliceIterator) Err() error { return nil }
 
-// {{ .TitlePrefix }}Unroll unrolls items ot slice of {{ .TypeName }}.
+// {{ .TitlePrefix }}Unroll unrolls items to slice of {{ .TypeName }}.
 func {{ .TitlePrefix }}Unroll(items {{ .TitlePrefix }}Iterator) {{ .TitlePrefix }}Slice {
 	var slice {{ .TitlePrefix }}Slice
 	panicIf{{ .TitlePrefix }}IteratorError({{ .TitlePrefix }}Discard({{ .TitlePrefix }}Handling(items, {{ .TitlePrefix }}Handle(func(item {{ .TypeName }}) error {
@@ -88,7 +88,7 @@ type {{ .TitlePrefix }}Slice []{{ .TypeName }}
 // MakeIter returns a new instance of {{ .TitlePrefix }}Iterator to iterate over it.
 // It returns Empty{{ .TitlePrefix }}Iterator if the error is not nil.
 func (s {{ .TitlePrefix }}Slice) MakeIter() {{ .TitlePrefix }}Iterator {
-	return NewShowtime{{ .TitlePrefix }}SliceIterator(s)
+	return New{{ .TitlePrefix }}SliceIterator(s)
 }
 
 // {{ .TitlePrefix }}Slice is a slice of {{ .TypeName }} which can make inverting iterator.
@@ -97,7 +97,7 @@ type Inverting{{ .TitlePrefix }}Slice []{{ .TypeName }}
 // MakeIter returns a new instance of {{ .TitlePrefix }}Iterator to iterate over it.
 // It returns Empty{{ .TitlePrefix }}Iterator if the error is not nil.
 func (s Inverting{{ .TitlePrefix }}Slice) MakeIter() {{ .TitlePrefix }}Iterator {
-	return NewInvertingShowtime{{ .TitlePrefix }}SliceIterator(s)
+	return NewInverting{{ .TitlePrefix }}SliceIterator(s)
 }
 
 // {{ .TitlePrefix }}Invert unrolls items and make inverting iterator based on them.

@@ -6,10 +6,10 @@ type Uint16SliceIterator struct {
 	cur   int
 }
 
-// NewShowtimeUint16SliceIterator returns a new instance of Uint16SliceIterator.
+// NewUint16SliceIterator returns a new instance of Uint16SliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use Uint16Unroll(slice).MakeIter() instead of to iterate over copies of item in the items.
-func NewShowtimeUint16SliceIterator(slice []uint16) *Uint16SliceIterator {
+func NewUint16SliceIterator(slice []uint16) *Uint16SliceIterator {
 	it := &Uint16SliceIterator{slice: slice}
 	return it
 }
@@ -42,10 +42,10 @@ type InvertingUint16SliceIterator struct {
 	cur   int
 }
 
-// NewInvertingShowtimeUint16SliceIterator returns a new instance of InvertingUint16SliceIterator.
+// NewInvertingUint16SliceIterator returns a new instance of InvertingUint16SliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use InvertingUint16Slice(Uint16Unroll(slice)).MakeIter() instead of to iterate over copies of item in the items.
-func NewInvertingShowtimeUint16SliceIterator(slice []uint16) *InvertingUint16SliceIterator {
+func NewInvertingUint16SliceIterator(slice []uint16) *InvertingUint16SliceIterator {
 	it := &InvertingUint16SliceIterator{slice: slice, cur: len(slice) - 1}
 	return it
 }
@@ -71,7 +71,7 @@ func (it *InvertingUint16SliceIterator) Next() uint16 {
 // Err contains first met error while Next.
 func (InvertingUint16SliceIterator) Err() error { return nil }
 
-// Uint16Unroll unrolls items ot slice of uint16.
+// Uint16Unroll unrolls items to slice of uint16.
 func Uint16Unroll(items Uint16Iterator) Uint16Slice {
 	var slice Uint16Slice
 	panicIfUint16IteratorError(Uint16Discard(Uint16Handling(items, Uint16Handle(func(item uint16) error {
@@ -88,7 +88,7 @@ type Uint16Slice []uint16
 // MakeIter returns a new instance of Uint16Iterator to iterate over it.
 // It returns EmptyUint16Iterator if the error is not nil.
 func (s Uint16Slice) MakeIter() Uint16Iterator {
-	return NewShowtimeUint16SliceIterator(s)
+	return NewUint16SliceIterator(s)
 }
 
 // Uint16Slice is a slice of uint16 which can make inverting iterator.
@@ -97,7 +97,7 @@ type InvertingUint16Slice []uint16
 // MakeIter returns a new instance of Uint16Iterator to iterate over it.
 // It returns EmptyUint16Iterator if the error is not nil.
 func (s InvertingUint16Slice) MakeIter() Uint16Iterator {
-	return NewInvertingShowtimeUint16SliceIterator(s)
+	return NewInvertingUint16SliceIterator(s)
 }
 
 // Uint16Invert unrolls items and make inverting iterator based on them.

@@ -6,10 +6,10 @@ type Uint64SliceIterator struct {
 	cur   int
 }
 
-// NewShowtimeUint64SliceIterator returns a new instance of Uint64SliceIterator.
+// NewUint64SliceIterator returns a new instance of Uint64SliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use Uint64Unroll(slice).MakeIter() instead of to iterate over copies of item in the items.
-func NewShowtimeUint64SliceIterator(slice []uint64) *Uint64SliceIterator {
+func NewUint64SliceIterator(slice []uint64) *Uint64SliceIterator {
 	it := &Uint64SliceIterator{slice: slice}
 	return it
 }
@@ -42,10 +42,10 @@ type InvertingUint64SliceIterator struct {
 	cur   int
 }
 
-// NewInvertingShowtimeUint64SliceIterator returns a new instance of InvertingUint64SliceIterator.
+// NewInvertingUint64SliceIterator returns a new instance of InvertingUint64SliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use InvertingUint64Slice(Uint64Unroll(slice)).MakeIter() instead of to iterate over copies of item in the items.
-func NewInvertingShowtimeUint64SliceIterator(slice []uint64) *InvertingUint64SliceIterator {
+func NewInvertingUint64SliceIterator(slice []uint64) *InvertingUint64SliceIterator {
 	it := &InvertingUint64SliceIterator{slice: slice, cur: len(slice) - 1}
 	return it
 }
@@ -71,7 +71,7 @@ func (it *InvertingUint64SliceIterator) Next() uint64 {
 // Err contains first met error while Next.
 func (InvertingUint64SliceIterator) Err() error { return nil }
 
-// Uint64Unroll unrolls items ot slice of uint64.
+// Uint64Unroll unrolls items to slice of uint64.
 func Uint64Unroll(items Uint64Iterator) Uint64Slice {
 	var slice Uint64Slice
 	panicIfUint64IteratorError(Uint64Discard(Uint64Handling(items, Uint64Handle(func(item uint64) error {
@@ -88,7 +88,7 @@ type Uint64Slice []uint64
 // MakeIter returns a new instance of Uint64Iterator to iterate over it.
 // It returns EmptyUint64Iterator if the error is not nil.
 func (s Uint64Slice) MakeIter() Uint64Iterator {
-	return NewShowtimeUint64SliceIterator(s)
+	return NewUint64SliceIterator(s)
 }
 
 // Uint64Slice is a slice of uint64 which can make inverting iterator.
@@ -97,7 +97,7 @@ type InvertingUint64Slice []uint64
 // MakeIter returns a new instance of Uint64Iterator to iterate over it.
 // It returns EmptyUint64Iterator if the error is not nil.
 func (s InvertingUint64Slice) MakeIter() Uint64Iterator {
-	return NewInvertingShowtimeUint64SliceIterator(s)
+	return NewInvertingUint64SliceIterator(s)
 }
 
 // Uint64Invert unrolls items and make inverting iterator based on them.

@@ -6,10 +6,10 @@ type RuneSliceIterator struct {
 	cur   int
 }
 
-// NewShowtimeRuneSliceIterator returns a new instance of RuneSliceIterator.
+// NewRuneSliceIterator returns a new instance of RuneSliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use RuneUnroll(slice).MakeIter() instead of to iterate over copies of item in the items.
-func NewShowtimeRuneSliceIterator(slice []rune) *RuneSliceIterator {
+func NewRuneSliceIterator(slice []rune) *RuneSliceIterator {
 	it := &RuneSliceIterator{slice: slice}
 	return it
 }
@@ -42,10 +42,10 @@ type InvertingRuneSliceIterator struct {
 	cur   int
 }
 
-// NewInvertingShowtimeRuneSliceIterator returns a new instance of InvertingRuneSliceIterator.
+// NewInvertingRuneSliceIterator returns a new instance of InvertingRuneSliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use InvertingRuneSlice(RuneUnroll(slice)).MakeIter() instead of to iterate over copies of item in the items.
-func NewInvertingShowtimeRuneSliceIterator(slice []rune) *InvertingRuneSliceIterator {
+func NewInvertingRuneSliceIterator(slice []rune) *InvertingRuneSliceIterator {
 	it := &InvertingRuneSliceIterator{slice: slice, cur: len(slice) - 1}
 	return it
 }
@@ -71,7 +71,7 @@ func (it *InvertingRuneSliceIterator) Next() rune {
 // Err contains first met error while Next.
 func (InvertingRuneSliceIterator) Err() error { return nil }
 
-// RuneUnroll unrolls items ot slice of rune.
+// RuneUnroll unrolls items to slice of rune.
 func RuneUnroll(items RuneIterator) RuneSlice {
 	var slice RuneSlice
 	panicIfRuneIteratorError(RuneDiscard(RuneHandling(items, RuneHandle(func(item rune) error {
@@ -88,7 +88,7 @@ type RuneSlice []rune
 // MakeIter returns a new instance of RuneIterator to iterate over it.
 // It returns EmptyRuneIterator if the error is not nil.
 func (s RuneSlice) MakeIter() RuneIterator {
-	return NewShowtimeRuneSliceIterator(s)
+	return NewRuneSliceIterator(s)
 }
 
 // RuneSlice is a slice of rune which can make inverting iterator.
@@ -97,7 +97,7 @@ type InvertingRuneSlice []rune
 // MakeIter returns a new instance of RuneIterator to iterate over it.
 // It returns EmptyRuneIterator if the error is not nil.
 func (s InvertingRuneSlice) MakeIter() RuneIterator {
-	return NewInvertingShowtimeRuneSliceIterator(s)
+	return NewInvertingRuneSliceIterator(s)
 }
 
 // RuneInvert unrolls items and make inverting iterator based on them.

@@ -19,8 +19,7 @@ func (baseGenIterPreparer) PreparePackagePath(path string) (string, error) {
 
 // PrepareContext prepares context.
 func (baseGenIterPreparer) PrepareContext(ctx app.GenerateIterContext) (app.GenerateIterContext, error) {
-	ctx.TitlePrefix = strings.Title(strings.ToLower(ctx.TitlePrefix))
-	ctx.PackageName = strings.ToLower(ctx.PackageName)
+	ctx.TitlePrefix = strings.Title(ctx.TitlePrefix)
 	return ctx, nil
 }
 

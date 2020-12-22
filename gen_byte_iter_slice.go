@@ -6,10 +6,10 @@ type ByteSliceIterator struct {
 	cur   int
 }
 
-// NewShowtimeByteSliceIterator returns a new instance of ByteSliceIterator.
+// NewByteSliceIterator returns a new instance of ByteSliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use ByteUnroll(slice).MakeIter() instead of to iterate over copies of item in the items.
-func NewShowtimeByteSliceIterator(slice []byte) *ByteSliceIterator {
+func NewByteSliceIterator(slice []byte) *ByteSliceIterator {
 	it := &ByteSliceIterator{slice: slice}
 	return it
 }
@@ -42,10 +42,10 @@ type InvertingByteSliceIterator struct {
 	cur   int
 }
 
-// NewInvertingShowtimeByteSliceIterator returns a new instance of InvertingByteSliceIterator.
+// NewInvertingByteSliceIterator returns a new instance of InvertingByteSliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use InvertingByteSlice(ByteUnroll(slice)).MakeIter() instead of to iterate over copies of item in the items.
-func NewInvertingShowtimeByteSliceIterator(slice []byte) *InvertingByteSliceIterator {
+func NewInvertingByteSliceIterator(slice []byte) *InvertingByteSliceIterator {
 	it := &InvertingByteSliceIterator{slice: slice, cur: len(slice) - 1}
 	return it
 }
@@ -71,7 +71,7 @@ func (it *InvertingByteSliceIterator) Next() byte {
 // Err contains first met error while Next.
 func (InvertingByteSliceIterator) Err() error { return nil }
 
-// ByteUnroll unrolls items ot slice of byte.
+// ByteUnroll unrolls items to slice of byte.
 func ByteUnroll(items ByteIterator) ByteSlice {
 	var slice ByteSlice
 	panicIfByteIteratorError(ByteDiscard(ByteHandling(items, ByteHandle(func(item byte) error {
@@ -88,7 +88,7 @@ type ByteSlice []byte
 // MakeIter returns a new instance of ByteIterator to iterate over it.
 // It returns EmptyByteIterator if the error is not nil.
 func (s ByteSlice) MakeIter() ByteIterator {
-	return NewShowtimeByteSliceIterator(s)
+	return NewByteSliceIterator(s)
 }
 
 // ByteSlice is a slice of byte which can make inverting iterator.
@@ -97,7 +97,7 @@ type InvertingByteSlice []byte
 // MakeIter returns a new instance of ByteIterator to iterate over it.
 // It returns EmptyByteIterator if the error is not nil.
 func (s InvertingByteSlice) MakeIter() ByteIterator {
-	return NewInvertingShowtimeByteSliceIterator(s)
+	return NewInvertingByteSliceIterator(s)
 }
 
 // ByteInvert unrolls items and make inverting iterator based on them.

@@ -2,6 +2,7 @@ package go_text_templates
 
 import (
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -41,7 +42,18 @@ func (m addTitlePrefixed) MakeFileName(templatePath string, ctx app.GenerateIter
 	if len(ctx.TitlePrefix) == 0 {
 		return fileName, nil
 	}
-	return strings.ToLower(ctx.TitlePrefix) + "_" + fileName, nil
+	return camelToSnakeCase(ctx.TitlePrefix) + "_" + fileName, nil
+}
+
+var (
+	matchFirstCap = regexp.MustCompile(`(.)([A-Z][a-z]+)`)
+	matchAllCap   = regexp.MustCompile(`([a-z0-9])([A-Z])`)
+)
+
+func camelToSnakeCase(str string) string {
+	snake := matchFirstCap.ReplaceAllString(str, "${1}_${2}")
+	snake = matchAllCap.ReplaceAllString(snake, "${1}_${2}")
+	return strings.ToLower(snake)
 }
 
 type customPrefixed struct {

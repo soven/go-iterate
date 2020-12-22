@@ -4,11 +4,11 @@ int8,Int8,0,iter
 int16,Int16,0,iter
 int32,Int32,0,iter
 int64,Int64,0,iter
-uint,UInt,0,iter
-uint8,UInt8,0,iter
-uint16,UInt16,0,iter
-uint32,UInt32,0,iter
-uint64,UInt64,0,iter
+uint,Uint,0,iter
+uint8,Uint8,0,iter
+uint16,Uint16,0,iter
+uint32,Uint32,0,iter
+uint64,Uint64,0,iter
 byte,Byte,0,iter
 rune,Rune,0,iter
 string,String,"",iter

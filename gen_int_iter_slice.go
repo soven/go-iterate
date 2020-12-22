@@ -6,10 +6,10 @@ type IntSliceIterator struct {
 	cur   int
 }
 
-// NewShowtimeIntSliceIterator returns a new instance of IntSliceIterator.
+// NewIntSliceIterator returns a new instance of IntSliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use IntUnroll(slice).MakeIter() instead of to iterate over copies of item in the items.
-func NewShowtimeIntSliceIterator(slice []int) *IntSliceIterator {
+func NewIntSliceIterator(slice []int) *IntSliceIterator {
 	it := &IntSliceIterator{slice: slice}
 	return it
 }
@@ -42,10 +42,10 @@ type InvertingIntSliceIterator struct {
 	cur   int
 }
 
-// NewInvertingShowtimeIntSliceIterator returns a new instance of InvertingIntSliceIterator.
+// NewInvertingIntSliceIterator returns a new instance of InvertingIntSliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use InvertingIntSlice(IntUnroll(slice)).MakeIter() instead of to iterate over copies of item in the items.
-func NewInvertingShowtimeIntSliceIterator(slice []int) *InvertingIntSliceIterator {
+func NewInvertingIntSliceIterator(slice []int) *InvertingIntSliceIterator {
 	it := &InvertingIntSliceIterator{slice: slice, cur: len(slice) - 1}
 	return it
 }
@@ -71,7 +71,7 @@ func (it *InvertingIntSliceIterator) Next() int {
 // Err contains first met error while Next.
 func (InvertingIntSliceIterator) Err() error { return nil }
 
-// IntUnroll unrolls items ot slice of int.
+// IntUnroll unrolls items to slice of int.
 func IntUnroll(items IntIterator) IntSlice {
 	var slice IntSlice
 	panicIfIntIteratorError(IntDiscard(IntHandling(items, IntHandle(func(item int) error {
@@ -88,7 +88,7 @@ type IntSlice []int
 // MakeIter returns a new instance of IntIterator to iterate over it.
 // It returns EmptyIntIterator if the error is not nil.
 func (s IntSlice) MakeIter() IntIterator {
-	return NewShowtimeIntSliceIterator(s)
+	return NewIntSliceIterator(s)
 }
 
 // IntSlice is a slice of int which can make inverting iterator.
@@ -97,7 +97,7 @@ type InvertingIntSlice []int
 // MakeIter returns a new instance of IntIterator to iterate over it.
 // It returns EmptyIntIterator if the error is not nil.
 func (s InvertingIntSlice) MakeIter() IntIterator {
-	return NewInvertingShowtimeIntSliceIterator(s)
+	return NewInvertingIntSliceIterator(s)
 }
 
 // IntInvert unrolls items and make inverting iterator based on them.

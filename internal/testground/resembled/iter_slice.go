@@ -6,10 +6,10 @@ type PrefixSliceIterator struct {
 	cur   int
 }
 
-// NewShowtimePrefixSliceIterator returns a new instance of PrefixSliceIterator.
+// NewPrefixSliceIterator returns a new instance of PrefixSliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use PrefixUnroll(slice).MakeIter() instead of to iterate over copies of item in the items.
-func NewShowtimePrefixSliceIterator(slice []Type) *PrefixSliceIterator {
+func NewPrefixSliceIterator(slice []Type) *PrefixSliceIterator {
 	it := &PrefixSliceIterator{slice: slice}
 	return it
 }
@@ -42,10 +42,10 @@ type InvertingPrefixSliceIterator struct {
 	cur   int
 }
 
-// NewInvertingShowtimePrefixSliceIterator returns a new instance of InvertingPrefixSliceIterator.
+// NewInvertingPrefixSliceIterator returns a new instance of InvertingPrefixSliceIterator.
 // Note: any changes in slice will affect correspond items in the iterator.
 // Use InvertingPrefixSlice(PrefixUnroll(slice)).MakeIter() instead of to iterate over copies of item in the items.
-func NewInvertingShowtimePrefixSliceIterator(slice []Type) *InvertingPrefixSliceIterator {
+func NewInvertingPrefixSliceIterator(slice []Type) *InvertingPrefixSliceIterator {
 	it := &InvertingPrefixSliceIterator{slice: slice, cur: len(slice) - 1}
 	return it
 }
@@ -88,7 +88,7 @@ type PrefixSlice []Type
 // MakeIter returns a new instance of PrefixIterator to iterate over it.
 // It returns EmptyPrefixIterator if the error is not nil.
 func (s PrefixSlice) MakeIter() PrefixIterator {
-	return NewShowtimePrefixSliceIterator(s)
+	return NewPrefixSliceIterator(s)
 }
 
 // PrefixSlice is a slice of Type which can make inverting iterator.
@@ -97,7 +97,7 @@ type InvertingPrefixSlice []Type
 // MakeIter returns a new instance of PrefixIterator to iterate over it.
 // It returns EmptyPrefixIterator if the error is not nil.
 func (s InvertingPrefixSlice) MakeIter() PrefixIterator {
-	return NewInvertingShowtimePrefixSliceIterator(s)
+	return NewInvertingPrefixSliceIterator(s)
 }
 
 // PrefixInvert unrolls items and make inverting iterator based on them.
