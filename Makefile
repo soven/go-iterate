@@ -82,3 +82,4 @@ mocks: clean_mocks
 	mockery --dir=$(MOCK_SOURCE_DIR) --output=$(MOCKS_DIR) --name=PrefixEnumConverter
 	mockery --dir=$(MOCK_SOURCE_DIR) --output=$(MOCKS_DIR) --name=PrefixHandler
 	mockery --dir=$(MOCK_SOURCE_DIR) --output=$(MOCKS_DIR) --name=PrefixEnumHandler
+	mockery --dir=$(MOCK_SOURCE_DIR) --output=$(MOCKS_DIR) --name=PrefixComparer
