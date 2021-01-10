@@ -1020,20 +1020,20 @@ func SuperStringIterator(itemList ...StringIterator) StringIterator {
 	return super
 }
 
-// StringComparer is a strategy to compare two types.
+// StringEnumComparer is a strategy to compare two types.
 type StringComparer interface {
 	// IsLess should be true if lhs is less than rhs.
 	IsLess(lhs, rhs string) bool
 }
 
 // StringCompare is a shortcut implementation
-// of StringComparer based on a function.
+// of StringEnumComparer based on a function.
 type StringCompare func(lhs, rhs string) bool
 
 // IsLess is true if lhs is less than rhs.
 func (c StringCompare) IsLess(lhs, rhs string) bool { return c(lhs, rhs) }
 
-// StringAlwaysLess is an implementation of StringComparer returning always true.
+// EnumStringAlwaysLess is an implementation of StringEnumComparer returning always true.
 var StringAlwaysLess StringComparer = StringCompare(func(_, _ string) bool { return true })
 
 type priorityStringIterator struct {
@@ -1113,6 +1113,114 @@ func PriorStringIterator(comparer StringComparer, itemList ...StringIterator) St
 			continue
 		}
 		prior = &priorityStringIterator{
+			lhs:      preparedStringItem{base: itemList[i]},
+			rhs:      preparedStringItem{base: prior},
+			comparer: comparer,
+		}
+	}
+
+	return prior
+}
+
+// StringEnumComparer is a strategy to compare two types and their order numbers.
+type StringEnumComparer interface {
+	// IsLess should be true if lhs is less than rhs.
+	IsLess(nLHS int, lhs string, nRHS int, rhs string) bool
+}
+
+// StringEnumCompare is a shortcut implementation
+// of StringEnumComparer based on a function.
+type StringEnumCompare func(nLHS int, lhs string, nRHS int, rhs string) bool
+
+// IsLess is true if lhs is less than rhs.
+func (c StringEnumCompare) IsLess(nLHS int, lhs string, nRHS int, rhs string) bool {
+	return c(nLHS, lhs, nRHS, rhs)
+}
+
+// EnumStringAlwaysLess is an implementation of StringEnumComparer returning always true.
+var EnumStringAlwaysLess StringEnumComparer = StringEnumCompare(
+	func(_ int, _ string, _ int, _ string) bool { return true })
+
+type priorityStringEnumIterator struct {
+	lhs, rhs           preparedStringItem
+	countLHS, countRHS int
+	comparer           StringEnumComparer
+}
+
+func (it *priorityStringEnumIterator) HasNext() bool {
+	if it.lhs.hasNext && it.rhs.hasNext {
+		return true
+	}
+	if !it.lhs.hasNext && it.lhs.HasNext() {
+		next := it.lhs.base.Next()
+		it.lhs.hasNext = true
+		it.lhs.next = next
+	}
+	if !it.rhs.hasNext && it.rhs.HasNext() {
+		next := it.rhs.base.Next()
+		it.rhs.hasNext = true
+		it.rhs.next = next
+	}
+
+	return it.lhs.hasNext || it.rhs.hasNext
+}
+
+func (it *priorityStringEnumIterator) Next() string {
+	if !it.lhs.hasNext && !it.rhs.hasNext {
+		panicIfStringIteratorError(
+			errors.New("no next"), "priority enum: next")
+	}
+
+	if !it.lhs.hasNext {
+		// it.rhs.hasNext == true
+		return it.rhs.Next()
+	}
+	if !it.rhs.hasNext {
+		// it.lhs.hasNext == true
+		return it.lhs.Next()
+	}
+
+	// both have next
+	lhsNext := it.lhs.Next()
+	rhsNext := it.rhs.Next()
+	if it.comparer.IsLess(it.countLHS, lhsNext, it.countRHS, rhsNext) {
+		// remember rhsNext
+		it.rhs.hasNext = true
+		it.rhs.next = rhsNext
+		it.countLHS++
+		return lhsNext
+	}
+
+	// rhsNext is less than or equal to lhsNext.
+	// remember lhsNext
+	it.lhs.hasNext = true
+	it.lhs.next = lhsNext
+	it.countRHS++
+	return rhsNext
+}
+
+func (it priorityStringEnumIterator) Err() error {
+	if err := it.lhs.Err(); err != nil {
+		return err
+	}
+	return it.rhs.Err()
+}
+
+// PriorStringEnumIterator compare one by one items and their ordering numbers fetched from
+// all iterators and choose smallest from them to return as next.
+// If comparer is nil so more left iterator is considered had smallest item.
+// It is recommended to use the iterator to order already ordered iterators.
+func PriorStringEnumIterator(comparer StringEnumComparer, itemList ...StringIterator) StringIterator {
+	if comparer == nil {
+		comparer = EnumStringAlwaysLess
+	}
+
+	var prior = EmptyStringIterator
+	for i := len(itemList) - 1; i >= 0; i-- {
+		if itemList[i] == nil {
+			continue
+		}
+		prior = &priorityStringEnumIterator{
 			lhs:      preparedStringItem{base: itemList[i]},
 			rhs:      preparedStringItem{base: prior},
 			comparer: comparer,

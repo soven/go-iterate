@@ -1020,20 +1020,20 @@ func SuperInt16Iterator(itemList ...Int16Iterator) Int16Iterator {
 	return super
 }
 
-// Int16Comparer is a strategy to compare two types.
+// Int16EnumComparer is a strategy to compare two types.
 type Int16Comparer interface {
 	// IsLess should be true if lhs is less than rhs.
 	IsLess(lhs, rhs int16) bool
 }
 
 // Int16Compare is a shortcut implementation
-// of Int16Comparer based on a function.
+// of Int16EnumComparer based on a function.
 type Int16Compare func(lhs, rhs int16) bool
 
 // IsLess is true if lhs is less than rhs.
 func (c Int16Compare) IsLess(lhs, rhs int16) bool { return c(lhs, rhs) }
 
-// Int16AlwaysLess is an implementation of Int16Comparer returning always true.
+// EnumInt16AlwaysLess is an implementation of Int16EnumComparer returning always true.
 var Int16AlwaysLess Int16Comparer = Int16Compare(func(_, _ int16) bool { return true })
 
 type priorityInt16Iterator struct {
@@ -1113,6 +1113,114 @@ func PriorInt16Iterator(comparer Int16Comparer, itemList ...Int16Iterator) Int16
 			continue
 		}
 		prior = &priorityInt16Iterator{
+			lhs:      preparedInt16Item{base: itemList[i]},
+			rhs:      preparedInt16Item{base: prior},
+			comparer: comparer,
+		}
+	}
+
+	return prior
+}
+
+// Int16EnumComparer is a strategy to compare two types and their order numbers.
+type Int16EnumComparer interface {
+	// IsLess should be true if lhs is less than rhs.
+	IsLess(nLHS int, lhs int16, nRHS int, rhs int16) bool
+}
+
+// Int16EnumCompare is a shortcut implementation
+// of Int16EnumComparer based on a function.
+type Int16EnumCompare func(nLHS int, lhs int16, nRHS int, rhs int16) bool
+
+// IsLess is true if lhs is less than rhs.
+func (c Int16EnumCompare) IsLess(nLHS int, lhs int16, nRHS int, rhs int16) bool {
+	return c(nLHS, lhs, nRHS, rhs)
+}
+
+// EnumInt16AlwaysLess is an implementation of Int16EnumComparer returning always true.
+var EnumInt16AlwaysLess Int16EnumComparer = Int16EnumCompare(
+	func(_ int, _ int16, _ int, _ int16) bool { return true })
+
+type priorityInt16EnumIterator struct {
+	lhs, rhs           preparedInt16Item
+	countLHS, countRHS int
+	comparer           Int16EnumComparer
+}
+
+func (it *priorityInt16EnumIterator) HasNext() bool {
+	if it.lhs.hasNext && it.rhs.hasNext {
+		return true
+	}
+	if !it.lhs.hasNext && it.lhs.HasNext() {
+		next := it.lhs.base.Next()
+		it.lhs.hasNext = true
+		it.lhs.next = next
+	}
+	if !it.rhs.hasNext && it.rhs.HasNext() {
+		next := it.rhs.base.Next()
+		it.rhs.hasNext = true
+		it.rhs.next = next
+	}
+
+	return it.lhs.hasNext || it.rhs.hasNext
+}
+
+func (it *priorityInt16EnumIterator) Next() int16 {
+	if !it.lhs.hasNext && !it.rhs.hasNext {
+		panicIfInt16IteratorError(
+			errors.New("no next"), "priority enum: next")
+	}
+
+	if !it.lhs.hasNext {
+		// it.rhs.hasNext == true
+		return it.rhs.Next()
+	}
+	if !it.rhs.hasNext {
+		// it.lhs.hasNext == true
+		return it.lhs.Next()
+	}
+
+	// both have next
+	lhsNext := it.lhs.Next()
+	rhsNext := it.rhs.Next()
+	if it.comparer.IsLess(it.countLHS, lhsNext, it.countRHS, rhsNext) {
+		// remember rhsNext
+		it.rhs.hasNext = true
+		it.rhs.next = rhsNext
+		it.countLHS++
+		return lhsNext
+	}
+
+	// rhsNext is less than or equal to lhsNext.
+	// remember lhsNext
+	it.lhs.hasNext = true
+	it.lhs.next = lhsNext
+	it.countRHS++
+	return rhsNext
+}
+
+func (it priorityInt16EnumIterator) Err() error {
+	if err := it.lhs.Err(); err != nil {
+		return err
+	}
+	return it.rhs.Err()
+}
+
+// PriorInt16EnumIterator compare one by one items and their ordering numbers fetched from
+// all iterators and choose smallest from them to return as next.
+// If comparer is nil so more left iterator is considered had smallest item.
+// It is recommended to use the iterator to order already ordered iterators.
+func PriorInt16EnumIterator(comparer Int16EnumComparer, itemList ...Int16Iterator) Int16Iterator {
+	if comparer == nil {
+		comparer = EnumInt16AlwaysLess
+	}
+
+	var prior = EmptyInt16Iterator
+	for i := len(itemList) - 1; i >= 0; i-- {
+		if itemList[i] == nil {
+			continue
+		}
+		prior = &priorityInt16EnumIterator{
 			lhs:      preparedInt16Item{base: itemList[i]},
 			rhs:      preparedInt16Item{base: prior},
 			comparer: comparer,

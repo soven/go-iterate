@@ -1020,20 +1020,20 @@ func SuperIterator(itemList ...Iterator) Iterator {
 	return super
 }
 
-// Comparer is a strategy to compare two types.
+// EnumComparer is a strategy to compare two types.
 type Comparer interface {
 	// IsLess should be true if lhs is less than rhs.
 	IsLess(lhs, rhs interface{}) bool
 }
 
 // Compare is a shortcut implementation
-// of Comparer based on a function.
+// of EnumComparer based on a function.
 type Compare func(lhs, rhs interface{}) bool
 
 // IsLess is true if lhs is less than rhs.
 func (c Compare) IsLess(lhs, rhs interface{}) bool { return c(lhs, rhs) }
 
-// AlwaysLess is an implementation of Comparer returning always true.
+// EnumAlwaysLess is an implementation of EnumComparer returning always true.
 var AlwaysLess Comparer = Compare(func(_, _ interface{}) bool { return true })
 
 type priorityIterator struct {
@@ -1113,6 +1113,114 @@ func PriorIterator(comparer Comparer, itemList ...Iterator) Iterator {
 			continue
 		}
 		prior = &priorityIterator{
+			lhs:      preparedItem{base: itemList[i]},
+			rhs:      preparedItem{base: prior},
+			comparer: comparer,
+		}
+	}
+
+	return prior
+}
+
+// EnumComparer is a strategy to compare two types and their order numbers.
+type EnumComparer interface {
+	// IsLess should be true if lhs is less than rhs.
+	IsLess(nLHS int, lhs interface{}, nRHS int, rhs interface{}) bool
+}
+
+// EnumCompare is a shortcut implementation
+// of EnumComparer based on a function.
+type EnumCompare func(nLHS int, lhs interface{}, nRHS int, rhs interface{}) bool
+
+// IsLess is true if lhs is less than rhs.
+func (c EnumCompare) IsLess(nLHS int, lhs interface{}, nRHS int, rhs interface{}) bool {
+	return c(nLHS, lhs, nRHS, rhs)
+}
+
+// EnumAlwaysLess is an implementation of EnumComparer returning always true.
+var EnumAlwaysLess EnumComparer = EnumCompare(
+	func(_ int, _ interface{}, _ int, _ interface{}) bool { return true })
+
+type priorityEnumIterator struct {
+	lhs, rhs           preparedItem
+	countLHS, countRHS int
+	comparer           EnumComparer
+}
+
+func (it *priorityEnumIterator) HasNext() bool {
+	if it.lhs.hasNext && it.rhs.hasNext {
+		return true
+	}
+	if !it.lhs.hasNext && it.lhs.HasNext() {
+		next := it.lhs.base.Next()
+		it.lhs.hasNext = true
+		it.lhs.next = next
+	}
+	if !it.rhs.hasNext && it.rhs.HasNext() {
+		next := it.rhs.base.Next()
+		it.rhs.hasNext = true
+		it.rhs.next = next
+	}
+
+	return it.lhs.hasNext || it.rhs.hasNext
+}
+
+func (it *priorityEnumIterator) Next() interface{} {
+	if !it.lhs.hasNext && !it.rhs.hasNext {
+		panicIfIteratorError(
+			errors.New("no next"), "priority enum: next")
+	}
+
+	if !it.lhs.hasNext {
+		// it.rhs.hasNext == true
+		return it.rhs.Next()
+	}
+	if !it.rhs.hasNext {
+		// it.lhs.hasNext == true
+		return it.lhs.Next()
+	}
+
+	// both have next
+	lhsNext := it.lhs.Next()
+	rhsNext := it.rhs.Next()
+	if it.comparer.IsLess(it.countLHS, lhsNext, it.countRHS, rhsNext) {
+		// remember rhsNext
+		it.rhs.hasNext = true
+		it.rhs.next = rhsNext
+		it.countLHS++
+		return lhsNext
+	}
+
+	// rhsNext is less than or equal to lhsNext.
+	// remember lhsNext
+	it.lhs.hasNext = true
+	it.lhs.next = lhsNext
+	it.countRHS++
+	return rhsNext
+}
+
+func (it priorityEnumIterator) Err() error {
+	if err := it.lhs.Err(); err != nil {
+		return err
+	}
+	return it.rhs.Err()
+}
+
+// PriorEnumIterator compare one by one items and their ordering numbers fetched from
+// all iterators and choose smallest from them to return as next.
+// If comparer is nil so more left iterator is considered had smallest item.
+// It is recommended to use the iterator to order already ordered iterators.
+func PriorEnumIterator(comparer EnumComparer, itemList ...Iterator) Iterator {
+	if comparer == nil {
+		comparer = EnumAlwaysLess
+	}
+
+	var prior = EmptyIterator
+	for i := len(itemList) - 1; i >= 0; i-- {
+		if itemList[i] == nil {
+			continue
+		}
+		prior = &priorityEnumIterator{
 			lhs:      preparedItem{base: itemList[i]},
 			rhs:      preparedItem{base: prior},
 			comparer: comparer,

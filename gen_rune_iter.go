@@ -1020,20 +1020,20 @@ func SuperRuneIterator(itemList ...RuneIterator) RuneIterator {
 	return super
 }
 
-// RuneComparer is a strategy to compare two types.
+// RuneEnumComparer is a strategy to compare two types.
 type RuneComparer interface {
 	// IsLess should be true if lhs is less than rhs.
 	IsLess(lhs, rhs rune) bool
 }
 
 // RuneCompare is a shortcut implementation
-// of RuneComparer based on a function.
+// of RuneEnumComparer based on a function.
 type RuneCompare func(lhs, rhs rune) bool
 
 // IsLess is true if lhs is less than rhs.
 func (c RuneCompare) IsLess(lhs, rhs rune) bool { return c(lhs, rhs) }
 
-// RuneAlwaysLess is an implementation of RuneComparer returning always true.
+// EnumRuneAlwaysLess is an implementation of RuneEnumComparer returning always true.
 var RuneAlwaysLess RuneComparer = RuneCompare(func(_, _ rune) bool { return true })
 
 type priorityRuneIterator struct {
@@ -1113,6 +1113,114 @@ func PriorRuneIterator(comparer RuneComparer, itemList ...RuneIterator) RuneIter
 			continue
 		}
 		prior = &priorityRuneIterator{
+			lhs:      preparedRuneItem{base: itemList[i]},
+			rhs:      preparedRuneItem{base: prior},
+			comparer: comparer,
+		}
+	}
+
+	return prior
+}
+
+// RuneEnumComparer is a strategy to compare two types and their order numbers.
+type RuneEnumComparer interface {
+	// IsLess should be true if lhs is less than rhs.
+	IsLess(nLHS int, lhs rune, nRHS int, rhs rune) bool
+}
+
+// RuneEnumCompare is a shortcut implementation
+// of RuneEnumComparer based on a function.
+type RuneEnumCompare func(nLHS int, lhs rune, nRHS int, rhs rune) bool
+
+// IsLess is true if lhs is less than rhs.
+func (c RuneEnumCompare) IsLess(nLHS int, lhs rune, nRHS int, rhs rune) bool {
+	return c(nLHS, lhs, nRHS, rhs)
+}
+
+// EnumRuneAlwaysLess is an implementation of RuneEnumComparer returning always true.
+var EnumRuneAlwaysLess RuneEnumComparer = RuneEnumCompare(
+	func(_ int, _ rune, _ int, _ rune) bool { return true })
+
+type priorityRuneEnumIterator struct {
+	lhs, rhs           preparedRuneItem
+	countLHS, countRHS int
+	comparer           RuneEnumComparer
+}
+
+func (it *priorityRuneEnumIterator) HasNext() bool {
+	if it.lhs.hasNext && it.rhs.hasNext {
+		return true
+	}
+	if !it.lhs.hasNext && it.lhs.HasNext() {
+		next := it.lhs.base.Next()
+		it.lhs.hasNext = true
+		it.lhs.next = next
+	}
+	if !it.rhs.hasNext && it.rhs.HasNext() {
+		next := it.rhs.base.Next()
+		it.rhs.hasNext = true
+		it.rhs.next = next
+	}
+
+	return it.lhs.hasNext || it.rhs.hasNext
+}
+
+func (it *priorityRuneEnumIterator) Next() rune {
+	if !it.lhs.hasNext && !it.rhs.hasNext {
+		panicIfRuneIteratorError(
+			errors.New("no next"), "priority enum: next")
+	}
+
+	if !it.lhs.hasNext {
+		// it.rhs.hasNext == true
+		return it.rhs.Next()
+	}
+	if !it.rhs.hasNext {
+		// it.lhs.hasNext == true
+		return it.lhs.Next()
+	}
+
+	// both have next
+	lhsNext := it.lhs.Next()
+	rhsNext := it.rhs.Next()
+	if it.comparer.IsLess(it.countLHS, lhsNext, it.countRHS, rhsNext) {
+		// remember rhsNext
+		it.rhs.hasNext = true
+		it.rhs.next = rhsNext
+		it.countLHS++
+		return lhsNext
+	}
+
+	// rhsNext is less than or equal to lhsNext.
+	// remember lhsNext
+	it.lhs.hasNext = true
+	it.lhs.next = lhsNext
+	it.countRHS++
+	return rhsNext
+}
+
+func (it priorityRuneEnumIterator) Err() error {
+	if err := it.lhs.Err(); err != nil {
+		return err
+	}
+	return it.rhs.Err()
+}
+
+// PriorRuneEnumIterator compare one by one items and their ordering numbers fetched from
+// all iterators and choose smallest from them to return as next.
+// If comparer is nil so more left iterator is considered had smallest item.
+// It is recommended to use the iterator to order already ordered iterators.
+func PriorRuneEnumIterator(comparer RuneEnumComparer, itemList ...RuneIterator) RuneIterator {
+	if comparer == nil {
+		comparer = EnumRuneAlwaysLess
+	}
+
+	var prior = EmptyRuneIterator
+	for i := len(itemList) - 1; i >= 0; i-- {
+		if itemList[i] == nil {
+			continue
+		}
+		prior = &priorityRuneEnumIterator{
 			lhs:      preparedRuneItem{base: itemList[i]},
 			rhs:      preparedRuneItem{base: prior},
 			comparer: comparer,

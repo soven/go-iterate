@@ -1020,20 +1020,20 @@ func SuperByteIterator(itemList ...ByteIterator) ByteIterator {
 	return super
 }
 
-// ByteComparer is a strategy to compare two types.
+// ByteEnumComparer is a strategy to compare two types.
 type ByteComparer interface {
 	// IsLess should be true if lhs is less than rhs.
 	IsLess(lhs, rhs byte) bool
 }
 
 // ByteCompare is a shortcut implementation
-// of ByteComparer based on a function.
+// of ByteEnumComparer based on a function.
 type ByteCompare func(lhs, rhs byte) bool
 
 // IsLess is true if lhs is less than rhs.
 func (c ByteCompare) IsLess(lhs, rhs byte) bool { return c(lhs, rhs) }
 
-// ByteAlwaysLess is an implementation of ByteComparer returning always true.
+// EnumByteAlwaysLess is an implementation of ByteEnumComparer returning always true.
 var ByteAlwaysLess ByteComparer = ByteCompare(func(_, _ byte) bool { return true })
 
 type priorityByteIterator struct {
@@ -1113,6 +1113,114 @@ func PriorByteIterator(comparer ByteComparer, itemList ...ByteIterator) ByteIter
 			continue
 		}
 		prior = &priorityByteIterator{
+			lhs:      preparedByteItem{base: itemList[i]},
+			rhs:      preparedByteItem{base: prior},
+			comparer: comparer,
+		}
+	}
+
+	return prior
+}
+
+// ByteEnumComparer is a strategy to compare two types and their order numbers.
+type ByteEnumComparer interface {
+	// IsLess should be true if lhs is less than rhs.
+	IsLess(nLHS int, lhs byte, nRHS int, rhs byte) bool
+}
+
+// ByteEnumCompare is a shortcut implementation
+// of ByteEnumComparer based on a function.
+type ByteEnumCompare func(nLHS int, lhs byte, nRHS int, rhs byte) bool
+
+// IsLess is true if lhs is less than rhs.
+func (c ByteEnumCompare) IsLess(nLHS int, lhs byte, nRHS int, rhs byte) bool {
+	return c(nLHS, lhs, nRHS, rhs)
+}
+
+// EnumByteAlwaysLess is an implementation of ByteEnumComparer returning always true.
+var EnumByteAlwaysLess ByteEnumComparer = ByteEnumCompare(
+	func(_ int, _ byte, _ int, _ byte) bool { return true })
+
+type priorityByteEnumIterator struct {
+	lhs, rhs           preparedByteItem
+	countLHS, countRHS int
+	comparer           ByteEnumComparer
+}
+
+func (it *priorityByteEnumIterator) HasNext() bool {
+	if it.lhs.hasNext && it.rhs.hasNext {
+		return true
+	}
+	if !it.lhs.hasNext && it.lhs.HasNext() {
+		next := it.lhs.base.Next()
+		it.lhs.hasNext = true
+		it.lhs.next = next
+	}
+	if !it.rhs.hasNext && it.rhs.HasNext() {
+		next := it.rhs.base.Next()
+		it.rhs.hasNext = true
+		it.rhs.next = next
+	}
+
+	return it.lhs.hasNext || it.rhs.hasNext
+}
+
+func (it *priorityByteEnumIterator) Next() byte {
+	if !it.lhs.hasNext && !it.rhs.hasNext {
+		panicIfByteIteratorError(
+			errors.New("no next"), "priority enum: next")
+	}
+
+	if !it.lhs.hasNext {
+		// it.rhs.hasNext == true
+		return it.rhs.Next()
+	}
+	if !it.rhs.hasNext {
+		// it.lhs.hasNext == true
+		return it.lhs.Next()
+	}
+
+	// both have next
+	lhsNext := it.lhs.Next()
+	rhsNext := it.rhs.Next()
+	if it.comparer.IsLess(it.countLHS, lhsNext, it.countRHS, rhsNext) {
+		// remember rhsNext
+		it.rhs.hasNext = true
+		it.rhs.next = rhsNext
+		it.countLHS++
+		return lhsNext
+	}
+
+	// rhsNext is less than or equal to lhsNext.
+	// remember lhsNext
+	it.lhs.hasNext = true
+	it.lhs.next = lhsNext
+	it.countRHS++
+	return rhsNext
+}
+
+func (it priorityByteEnumIterator) Err() error {
+	if err := it.lhs.Err(); err != nil {
+		return err
+	}
+	return it.rhs.Err()
+}
+
+// PriorByteEnumIterator compare one by one items and their ordering numbers fetched from
+// all iterators and choose smallest from them to return as next.
+// If comparer is nil so more left iterator is considered had smallest item.
+// It is recommended to use the iterator to order already ordered iterators.
+func PriorByteEnumIterator(comparer ByteEnumComparer, itemList ...ByteIterator) ByteIterator {
+	if comparer == nil {
+		comparer = EnumByteAlwaysLess
+	}
+
+	var prior = EmptyByteIterator
+	for i := len(itemList) - 1; i >= 0; i-- {
+		if itemList[i] == nil {
+			continue
+		}
+		prior = &priorityByteEnumIterator{
 			lhs:      preparedByteItem{base: itemList[i]},
 			rhs:      preparedByteItem{base: prior},
 			comparer: comparer,

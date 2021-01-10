@@ -1020,20 +1020,20 @@ func SuperInt64Iterator(itemList ...Int64Iterator) Int64Iterator {
 	return super
 }
 
-// Int64Comparer is a strategy to compare two types.
+// Int64EnumComparer is a strategy to compare two types.
 type Int64Comparer interface {
 	// IsLess should be true if lhs is less than rhs.
 	IsLess(lhs, rhs int64) bool
 }
 
 // Int64Compare is a shortcut implementation
-// of Int64Comparer based on a function.
+// of Int64EnumComparer based on a function.
 type Int64Compare func(lhs, rhs int64) bool
 
 // IsLess is true if lhs is less than rhs.
 func (c Int64Compare) IsLess(lhs, rhs int64) bool { return c(lhs, rhs) }
 
-// Int64AlwaysLess is an implementation of Int64Comparer returning always true.
+// EnumInt64AlwaysLess is an implementation of Int64EnumComparer returning always true.
 var Int64AlwaysLess Int64Comparer = Int64Compare(func(_, _ int64) bool { return true })
 
 type priorityInt64Iterator struct {
@@ -1113,6 +1113,114 @@ func PriorInt64Iterator(comparer Int64Comparer, itemList ...Int64Iterator) Int64
 			continue
 		}
 		prior = &priorityInt64Iterator{
+			lhs:      preparedInt64Item{base: itemList[i]},
+			rhs:      preparedInt64Item{base: prior},
+			comparer: comparer,
+		}
+	}
+
+	return prior
+}
+
+// Int64EnumComparer is a strategy to compare two types and their order numbers.
+type Int64EnumComparer interface {
+	// IsLess should be true if lhs is less than rhs.
+	IsLess(nLHS int, lhs int64, nRHS int, rhs int64) bool
+}
+
+// Int64EnumCompare is a shortcut implementation
+// of Int64EnumComparer based on a function.
+type Int64EnumCompare func(nLHS int, lhs int64, nRHS int, rhs int64) bool
+
+// IsLess is true if lhs is less than rhs.
+func (c Int64EnumCompare) IsLess(nLHS int, lhs int64, nRHS int, rhs int64) bool {
+	return c(nLHS, lhs, nRHS, rhs)
+}
+
+// EnumInt64AlwaysLess is an implementation of Int64EnumComparer returning always true.
+var EnumInt64AlwaysLess Int64EnumComparer = Int64EnumCompare(
+	func(_ int, _ int64, _ int, _ int64) bool { return true })
+
+type priorityInt64EnumIterator struct {
+	lhs, rhs           preparedInt64Item
+	countLHS, countRHS int
+	comparer           Int64EnumComparer
+}
+
+func (it *priorityInt64EnumIterator) HasNext() bool {
+	if it.lhs.hasNext && it.rhs.hasNext {
+		return true
+	}
+	if !it.lhs.hasNext && it.lhs.HasNext() {
+		next := it.lhs.base.Next()
+		it.lhs.hasNext = true
+		it.lhs.next = next
+	}
+	if !it.rhs.hasNext && it.rhs.HasNext() {
+		next := it.rhs.base.Next()
+		it.rhs.hasNext = true
+		it.rhs.next = next
+	}
+
+	return it.lhs.hasNext || it.rhs.hasNext
+}
+
+func (it *priorityInt64EnumIterator) Next() int64 {
+	if !it.lhs.hasNext && !it.rhs.hasNext {
+		panicIfInt64IteratorError(
+			errors.New("no next"), "priority enum: next")
+	}
+
+	if !it.lhs.hasNext {
+		// it.rhs.hasNext == true
+		return it.rhs.Next()
+	}
+	if !it.rhs.hasNext {
+		// it.lhs.hasNext == true
+		return it.lhs.Next()
+	}
+
+	// both have next
+	lhsNext := it.lhs.Next()
+	rhsNext := it.rhs.Next()
+	if it.comparer.IsLess(it.countLHS, lhsNext, it.countRHS, rhsNext) {
+		// remember rhsNext
+		it.rhs.hasNext = true
+		it.rhs.next = rhsNext
+		it.countLHS++
+		return lhsNext
+	}
+
+	// rhsNext is less than or equal to lhsNext.
+	// remember lhsNext
+	it.lhs.hasNext = true
+	it.lhs.next = lhsNext
+	it.countRHS++
+	return rhsNext
+}
+
+func (it priorityInt64EnumIterator) Err() error {
+	if err := it.lhs.Err(); err != nil {
+		return err
+	}
+	return it.rhs.Err()
+}
+
+// PriorInt64EnumIterator compare one by one items and their ordering numbers fetched from
+// all iterators and choose smallest from them to return as next.
+// If comparer is nil so more left iterator is considered had smallest item.
+// It is recommended to use the iterator to order already ordered iterators.
+func PriorInt64EnumIterator(comparer Int64EnumComparer, itemList ...Int64Iterator) Int64Iterator {
+	if comparer == nil {
+		comparer = EnumInt64AlwaysLess
+	}
+
+	var prior = EmptyInt64Iterator
+	for i := len(itemList) - 1; i >= 0; i-- {
+		if itemList[i] == nil {
+			continue
+		}
+		prior = &priorityInt64EnumIterator{
 			lhs:      preparedInt64Item{base: itemList[i]},
 			rhs:      preparedInt64Item{base: prior},
 			comparer: comparer,

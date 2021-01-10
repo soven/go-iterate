@@ -1020,20 +1020,20 @@ func SuperUint32Iterator(itemList ...Uint32Iterator) Uint32Iterator {
 	return super
 }
 
-// Uint32Comparer is a strategy to compare two types.
+// Uint32EnumComparer is a strategy to compare two types.
 type Uint32Comparer interface {
 	// IsLess should be true if lhs is less than rhs.
 	IsLess(lhs, rhs uint32) bool
 }
 
 // Uint32Compare is a shortcut implementation
-// of Uint32Comparer based on a function.
+// of Uint32EnumComparer based on a function.
 type Uint32Compare func(lhs, rhs uint32) bool
 
 // IsLess is true if lhs is less than rhs.
 func (c Uint32Compare) IsLess(lhs, rhs uint32) bool { return c(lhs, rhs) }
 
-// Uint32AlwaysLess is an implementation of Uint32Comparer returning always true.
+// EnumUint32AlwaysLess is an implementation of Uint32EnumComparer returning always true.
 var Uint32AlwaysLess Uint32Comparer = Uint32Compare(func(_, _ uint32) bool { return true })
 
 type priorityUint32Iterator struct {
@@ -1113,6 +1113,114 @@ func PriorUint32Iterator(comparer Uint32Comparer, itemList ...Uint32Iterator) Ui
 			continue
 		}
 		prior = &priorityUint32Iterator{
+			lhs:      preparedUint32Item{base: itemList[i]},
+			rhs:      preparedUint32Item{base: prior},
+			comparer: comparer,
+		}
+	}
+
+	return prior
+}
+
+// Uint32EnumComparer is a strategy to compare two types and their order numbers.
+type Uint32EnumComparer interface {
+	// IsLess should be true if lhs is less than rhs.
+	IsLess(nLHS int, lhs uint32, nRHS int, rhs uint32) bool
+}
+
+// Uint32EnumCompare is a shortcut implementation
+// of Uint32EnumComparer based on a function.
+type Uint32EnumCompare func(nLHS int, lhs uint32, nRHS int, rhs uint32) bool
+
+// IsLess is true if lhs is less than rhs.
+func (c Uint32EnumCompare) IsLess(nLHS int, lhs uint32, nRHS int, rhs uint32) bool {
+	return c(nLHS, lhs, nRHS, rhs)
+}
+
+// EnumUint32AlwaysLess is an implementation of Uint32EnumComparer returning always true.
+var EnumUint32AlwaysLess Uint32EnumComparer = Uint32EnumCompare(
+	func(_ int, _ uint32, _ int, _ uint32) bool { return true })
+
+type priorityUint32EnumIterator struct {
+	lhs, rhs           preparedUint32Item
+	countLHS, countRHS int
+	comparer           Uint32EnumComparer
+}
+
+func (it *priorityUint32EnumIterator) HasNext() bool {
+	if it.lhs.hasNext && it.rhs.hasNext {
+		return true
+	}
+	if !it.lhs.hasNext && it.lhs.HasNext() {
+		next := it.lhs.base.Next()
+		it.lhs.hasNext = true
+		it.lhs.next = next
+	}
+	if !it.rhs.hasNext && it.rhs.HasNext() {
+		next := it.rhs.base.Next()
+		it.rhs.hasNext = true
+		it.rhs.next = next
+	}
+
+	return it.lhs.hasNext || it.rhs.hasNext
+}
+
+func (it *priorityUint32EnumIterator) Next() uint32 {
+	if !it.lhs.hasNext && !it.rhs.hasNext {
+		panicIfUint32IteratorError(
+			errors.New("no next"), "priority enum: next")
+	}
+
+	if !it.lhs.hasNext {
+		// it.rhs.hasNext == true
+		return it.rhs.Next()
+	}
+	if !it.rhs.hasNext {
+		// it.lhs.hasNext == true
+		return it.lhs.Next()
+	}
+
+	// both have next
+	lhsNext := it.lhs.Next()
+	rhsNext := it.rhs.Next()
+	if it.comparer.IsLess(it.countLHS, lhsNext, it.countRHS, rhsNext) {
+		// remember rhsNext
+		it.rhs.hasNext = true
+		it.rhs.next = rhsNext
+		it.countLHS++
+		return lhsNext
+	}
+
+	// rhsNext is less than or equal to lhsNext.
+	// remember lhsNext
+	it.lhs.hasNext = true
+	it.lhs.next = lhsNext
+	it.countRHS++
+	return rhsNext
+}
+
+func (it priorityUint32EnumIterator) Err() error {
+	if err := it.lhs.Err(); err != nil {
+		return err
+	}
+	return it.rhs.Err()
+}
+
+// PriorUint32EnumIterator compare one by one items and their ordering numbers fetched from
+// all iterators and choose smallest from them to return as next.
+// If comparer is nil so more left iterator is considered had smallest item.
+// It is recommended to use the iterator to order already ordered iterators.
+func PriorUint32EnumIterator(comparer Uint32EnumComparer, itemList ...Uint32Iterator) Uint32Iterator {
+	if comparer == nil {
+		comparer = EnumUint32AlwaysLess
+	}
+
+	var prior = EmptyUint32Iterator
+	for i := len(itemList) - 1; i >= 0; i-- {
+		if itemList[i] == nil {
+			continue
+		}
+		prior = &priorityUint32EnumIterator{
 			lhs:      preparedUint32Item{base: itemList[i]},
 			rhs:      preparedUint32Item{base: prior},
 			comparer: comparer,

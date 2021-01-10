@@ -1020,20 +1020,20 @@ func SuperUint8Iterator(itemList ...Uint8Iterator) Uint8Iterator {
 	return super
 }
 
-// Uint8Comparer is a strategy to compare two types.
+// Uint8EnumComparer is a strategy to compare two types.
 type Uint8Comparer interface {
 	// IsLess should be true if lhs is less than rhs.
 	IsLess(lhs, rhs uint8) bool
 }
 
 // Uint8Compare is a shortcut implementation
-// of Uint8Comparer based on a function.
+// of Uint8EnumComparer based on a function.
 type Uint8Compare func(lhs, rhs uint8) bool
 
 // IsLess is true if lhs is less than rhs.
 func (c Uint8Compare) IsLess(lhs, rhs uint8) bool { return c(lhs, rhs) }
 
-// Uint8AlwaysLess is an implementation of Uint8Comparer returning always true.
+// EnumUint8AlwaysLess is an implementation of Uint8EnumComparer returning always true.
 var Uint8AlwaysLess Uint8Comparer = Uint8Compare(func(_, _ uint8) bool { return true })
 
 type priorityUint8Iterator struct {
@@ -1113,6 +1113,114 @@ func PriorUint8Iterator(comparer Uint8Comparer, itemList ...Uint8Iterator) Uint8
 			continue
 		}
 		prior = &priorityUint8Iterator{
+			lhs:      preparedUint8Item{base: itemList[i]},
+			rhs:      preparedUint8Item{base: prior},
+			comparer: comparer,
+		}
+	}
+
+	return prior
+}
+
+// Uint8EnumComparer is a strategy to compare two types and their order numbers.
+type Uint8EnumComparer interface {
+	// IsLess should be true if lhs is less than rhs.
+	IsLess(nLHS int, lhs uint8, nRHS int, rhs uint8) bool
+}
+
+// Uint8EnumCompare is a shortcut implementation
+// of Uint8EnumComparer based on a function.
+type Uint8EnumCompare func(nLHS int, lhs uint8, nRHS int, rhs uint8) bool
+
+// IsLess is true if lhs is less than rhs.
+func (c Uint8EnumCompare) IsLess(nLHS int, lhs uint8, nRHS int, rhs uint8) bool {
+	return c(nLHS, lhs, nRHS, rhs)
+}
+
+// EnumUint8AlwaysLess is an implementation of Uint8EnumComparer returning always true.
+var EnumUint8AlwaysLess Uint8EnumComparer = Uint8EnumCompare(
+	func(_ int, _ uint8, _ int, _ uint8) bool { return true })
+
+type priorityUint8EnumIterator struct {
+	lhs, rhs           preparedUint8Item
+	countLHS, countRHS int
+	comparer           Uint8EnumComparer
+}
+
+func (it *priorityUint8EnumIterator) HasNext() bool {
+	if it.lhs.hasNext && it.rhs.hasNext {
+		return true
+	}
+	if !it.lhs.hasNext && it.lhs.HasNext() {
+		next := it.lhs.base.Next()
+		it.lhs.hasNext = true
+		it.lhs.next = next
+	}
+	if !it.rhs.hasNext && it.rhs.HasNext() {
+		next := it.rhs.base.Next()
+		it.rhs.hasNext = true
+		it.rhs.next = next
+	}
+
+	return it.lhs.hasNext || it.rhs.hasNext
+}
+
+func (it *priorityUint8EnumIterator) Next() uint8 {
+	if !it.lhs.hasNext && !it.rhs.hasNext {
+		panicIfUint8IteratorError(
+			errors.New("no next"), "priority enum: next")
+	}
+
+	if !it.lhs.hasNext {
+		// it.rhs.hasNext == true
+		return it.rhs.Next()
+	}
+	if !it.rhs.hasNext {
+		// it.lhs.hasNext == true
+		return it.lhs.Next()
+	}
+
+	// both have next
+	lhsNext := it.lhs.Next()
+	rhsNext := it.rhs.Next()
+	if it.comparer.IsLess(it.countLHS, lhsNext, it.countRHS, rhsNext) {
+		// remember rhsNext
+		it.rhs.hasNext = true
+		it.rhs.next = rhsNext
+		it.countLHS++
+		return lhsNext
+	}
+
+	// rhsNext is less than or equal to lhsNext.
+	// remember lhsNext
+	it.lhs.hasNext = true
+	it.lhs.next = lhsNext
+	it.countRHS++
+	return rhsNext
+}
+
+func (it priorityUint8EnumIterator) Err() error {
+	if err := it.lhs.Err(); err != nil {
+		return err
+	}
+	return it.rhs.Err()
+}
+
+// PriorUint8EnumIterator compare one by one items and their ordering numbers fetched from
+// all iterators and choose smallest from them to return as next.
+// If comparer is nil so more left iterator is considered had smallest item.
+// It is recommended to use the iterator to order already ordered iterators.
+func PriorUint8EnumIterator(comparer Uint8EnumComparer, itemList ...Uint8Iterator) Uint8Iterator {
+	if comparer == nil {
+		comparer = EnumUint8AlwaysLess
+	}
+
+	var prior = EmptyUint8Iterator
+	for i := len(itemList) - 1; i >= 0; i-- {
+		if itemList[i] == nil {
+			continue
+		}
+		prior = &priorityUint8EnumIterator{
 			lhs:      preparedUint8Item{base: itemList[i]},
 			rhs:      preparedUint8Item{base: prior},
 			comparer: comparer,
