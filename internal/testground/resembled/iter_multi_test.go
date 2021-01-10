@@ -145,3 +145,65 @@ func Test_PriorPrefixIterator(t *testing.T) {
 		})
 	}
 }
+
+func mockPrefixEnumComparer(nLHS, lhs, rhs, nRHS, ret interface{}) resembled.PrefixEnumComparer {
+	m := &mocks.PrefixEnumComparer{}
+	m.
+		On("IsLess", nLHS, lhs, rhs, nRHS).Return(ret)
+	return m
+}
+
+func Test_PriorPrefixEnumIterator(t *testing.T) {
+	tests := []struct {
+		name     string
+		comparer resembled.PrefixEnumComparer
+		iters    []resembled.PrefixIterator
+		want     []resembled.Type
+	}{
+		{
+			name: "general",
+			comparer: mockPrefixEnumComparer(mock.Anything, mock.Anything, mock.Anything, mock.Anything,
+				func(nLHS int, _ resembled.Type, nRHS int, _ resembled.Type) bool { return nLHS <= 1 && nRHS >= 1 },
+			),
+			iters: []resembled.PrefixIterator{
+				mockPrefixIterator(1, 4, 7),
+				mockPrefixIterator(2, 5, 8),
+				mockPrefixIterator(3, 6),
+			},
+			want: []resembled.Type{3, 1, 4, 2, 5, 6, 8, 7},
+		},
+		{
+			name:  "iters empty",
+			iters: nil,
+			want:  nil,
+		},
+		{
+			name:     "comparer empty",
+			comparer: nil,
+			iters: []resembled.PrefixIterator{
+				mockPrefixIterator(1, 4, 7),
+				mockPrefixIterator(2, 5, 8),
+				mockPrefixIterator(3, 6),
+			},
+			want: []resembled.Type{1, 4, 7, 2, 5, 8, 3, 6},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			items := resembled.PriorPrefixEnumIterator(tt.comparer, tt.iters...)
+			for _, item := range tt.want {
+				if !assert.True(t, items.HasNext()) {
+					return
+				}
+				if !assert.Equal(t, item, items.Next()) {
+					return
+				}
+			}
+			if !assert.False(t, items.HasNext()) {
+				return
+			}
+			assert.NoError(t, items.Err())
+		})
+	}
+}
