@@ -57,7 +57,7 @@ type PrefixCompare func(lhs, rhs Type) bool
 func (c PrefixCompare) IsLess(lhs, rhs Type) bool { return c(lhs, rhs) }
 
 // PrefixAlwaysLess is an implementation of PrefixComparer returning always true.
-var PrefixAlwaysLess = PrefixCompare(func(_, _ Type) bool { return true })
+var PrefixAlwaysLess PrefixComparer = PrefixCompare(func(_, _ Type) bool { return true })
 
 type priorityPrefixIterator struct {
 	lhs, rhs preparedPrefixItem

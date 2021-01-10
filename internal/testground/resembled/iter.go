@@ -1,5 +1,9 @@
 package resembled
 
+import "github.com/pkg/errors"
+
+var _ = errors.New("") // hack to get import // TODO clearly
+
 // PrefixIterator is an iterator over items type of Type.
 type PrefixIterator interface {
 	// HasNext checks if there is the next item

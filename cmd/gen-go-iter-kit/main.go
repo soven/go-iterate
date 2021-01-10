@@ -21,12 +21,6 @@ import (
 
 var allTemplatePaths = []string{
 	"templates/iter.go.tmpl",
-	"templates/iter_check.go.tmpl",
-	"templates/iter_convert.go.tmpl",
-	"templates/iter_handle.go.tmpl",
-	"templates/iter_multi.go.tmpl",
-	"templates/iter_slice.go.tmpl",
-	"templates/iter_util.go.tmpl",
 }
 
 var isDevEnv = strings.ToLower(os.Getenv("ENV")) == "dev"

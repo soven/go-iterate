@@ -1,8 +1,6 @@
 package resembled
 
-import (
-	"github.com/pkg/errors"
-)
+import "github.com/pkg/errors"
 
 // PrefixHandler is an object handling an item type of Type.
 type PrefixHandler interface {

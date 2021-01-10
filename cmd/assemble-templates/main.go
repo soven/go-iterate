@@ -7,7 +7,7 @@ import (
 
 	"github.com/soven/go-iterate/internal/app"
 	"github.com/soven/go-iterate/internal/app/go_replacer_assembler"
-	"github.com/soven/go-iterate/internal/app/multiple"
+	"github.com/soven/go-iterate/internal/app/join"
 	"github.com/soven/go-iterate/internal/cli"
 )
 
@@ -29,7 +29,7 @@ func run() error {
 	}
 
 	controller := cli.NewTemplateAssembler(
-		multiple.TemplateAssemblers(templateGenerators...))
+		join.TemplateAssemblers(templateGenerators...))
 	err := controller.AssembleTemplate()
 	if err != nil {
 		return errors.Wrap(err, "controller assemble template")

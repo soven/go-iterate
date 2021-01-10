@@ -1,5 +1,9 @@
 package {{ .PackageName }}
 
+import "github.com/pkg/errors"
+
+var _ = errors.New("") // hack to get import // TODO clearly
+
 // {{ .TitlePrefix }}Iterator is an iterator over items type of {{ .TypeName }}.
 type {{ .TitlePrefix }}Iterator interface {
 	// HasNext checks if there is the next item
@@ -50,4 +54,1243 @@ func {{ .TitlePrefix }}Discard(items {{ .TitlePrefix }}Iterator) error {
 	}
 	// no error wrapping since no additional context for the error; just return it.
 	return items.Err()
+}
+
+
+
+// {{ .TitlePrefix }}Checker is an object checking an item type of {{ .TypeName }}
+// for some condition.
+type {{ .TitlePrefix }}Checker interface {
+	// Check should check an item type of {{ .TypeName }} for some condition.
+	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+	Check({{ .TypeName }}) (bool, error)
+}
+
+// {{ .TitlePrefix }}Check is a shortcut implementation
+// of {{ .TitlePrefix }}Checker based on a function.
+type {{ .TitlePrefix }}Check func({{ .TypeName }}) (bool, error)
+
+// Check checks an item type of {{ .TypeName }} for some condition.
+// It returns EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+func (ch {{ .TitlePrefix }}Check) Check(item {{ .TypeName }}) (bool, error) { return ch(item) }
+
+var (
+	// Always{{ .TitlePrefix }}CheckTrue always returns true and empty error.
+	Always{{ .TitlePrefix }}CheckTrue {{ .TitlePrefix }}Checker = {{ .TitlePrefix }}Check(
+		func(item {{ .TypeName }}) (bool, error) { return true, nil })
+	// Always{{ .TitlePrefix }}CheckFalse always returns false and empty error.
+	Always{{ .TitlePrefix }}CheckFalse {{ .TitlePrefix }}Checker = {{ .TitlePrefix }}Check(
+		func(item {{ .TypeName }}) (bool, error) { return false, nil })
+)
+
+// Not{{ .TitlePrefix }} do an inversion for checker result.
+// It is returns Always{{ .TitlePrefix }}CheckTrue if checker is nil.
+func Not{{ .TitlePrefix }}(checker {{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Checker {
+	if checker == nil {
+		return Always{{ .TitlePrefix }}CheckTrue
+	}
+	return {{ .TitlePrefix }}Check(func(item {{ .TypeName }}) (bool, error) {
+		yes, err := checker.Check(item)
+		if err != nil {
+			// No error wrapping since an error context is missing.
+			return false, err
+		}
+
+		return !yes, nil
+	})
+}
+
+type and{{ .TitlePrefix }} struct {
+	lhs, rhs {{ .TitlePrefix }}Checker
+}
+
+func (a and{{ .TitlePrefix }}) Check(item {{ .TypeName }}) (bool, error) {
+	isLHSPassed, err := a.lhs.Check(item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "lhs check")
+	}
+	if !isLHSPassed {
+		return false, nil
+	}
+
+	isRHSPassed, err := a.rhs.Check(item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "rhs check")
+	}
+	return isRHSPassed, nil
+}
+
+// All{{ .TitlePrefix }} combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true checker if the list of checkers is empty.
+func All{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Checker {
+	var all = Always{{ .TitlePrefix }}CheckTrue
+	for i := len(checkers) - 1; i >= 0; i-- {
+		if checkers[i] == nil {
+			continue
+		}
+		all = and{{ .TitlePrefix }}{checkers[i], all}
+	}
+	return all
+}
+
+type or{{ .TitlePrefix }} struct {
+	lhs, rhs {{ .TitlePrefix }}Checker
+}
+
+func (o or{{ .TitlePrefix }}) Check(item {{ .TypeName }}) (bool, error) {
+	isLHSPassed, err := o.lhs.Check(item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "lhs check")
+	}
+	if isLHSPassed {
+		return true, nil
+	}
+
+	isRHSPassed, err := o.rhs.Check(item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "rhs check")
+	}
+	return isRHSPassed, nil
+}
+
+// Any{{ .TitlePrefix }} combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
+func Any{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Checker {
+	var any = Always{{ .TitlePrefix }}CheckFalse
+	for i := len(checkers) - 1; i >= 0; i-- {
+		if checkers[i] == nil {
+			continue
+		}
+		any = or{{ .TitlePrefix }}{checkers[i], any}
+	}
+	return any
+}
+
+// Filtering{{ .TitlePrefix }}Iterator does iteration with
+// filtering by previously set checker.
+type Filtering{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	filter {{ .TitlePrefix }}Checker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *Filtering{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		isFilterPassed, err := it.filter.Check(next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "filtering iterator: check")
+			}
+			it.err = err
+			return false
+		}
+
+		if !isFilterPassed {
+			continue
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}Filtering sets filter while iterating over items.
+// If filters is empty, so all items will return.
+func {{ .TitlePrefix }}Filtering(items {{ .TitlePrefix }}Iterator, filters ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &Filtering{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, All{{ .TitlePrefix }}(filters...)}
+}
+
+// DoingUntil{{ .TitlePrefix }}Iterator does iteration
+// until previously set checker is passed.
+type DoingUntil{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	until {{ .TitlePrefix }}Checker
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *DoingUntil{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+
+		if isUntilPassed {
+			it.err = EndOf{{ .TitlePrefix }}Iterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}DoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func {{ .TitlePrefix }}DoingUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}Checker) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	var until {{ .TitlePrefix }}Checker
+	if len(untilList) > 0 {
+		until = All{{ .TitlePrefix }}(untilList...)
+	} else {
+		until = Always{{ .TitlePrefix }}CheckFalse
+	}
+	return &DoingUntil{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, until}
+}
+
+// {{ .TitlePrefix }}SkipUntil sets until conditions to skip few items.
+func {{ .TitlePrefix }}SkipUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}Checker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}DoingUntil(items, untilList...))
+}
+
+// {{ .TitlePrefix }}EnumChecker is an object checking an item type of {{ .TypeName }}
+// and its ordering number in for some condition.
+type {{ .TitlePrefix }}EnumChecker interface {
+	// Check checks an item type of {{ .TypeName }} and its ordering number for some condition.
+	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+	Check(int, {{ .TypeName }}) (bool, error)
+}
+
+// {{ .TitlePrefix }}EnumCheck is a shortcut implementation
+// of {{ .TitlePrefix }}EnumChecker based on a function.
+type {{ .TitlePrefix }}EnumCheck func(int, {{ .TypeName }}) (bool, error)
+
+// Check checks an item type of {{ .TypeName }} and its ordering number for some condition.
+// It returns EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+func (ch {{ .TitlePrefix }}EnumCheck) Check(n int, item {{ .TypeName }}) (bool, error) { return ch(n, item) }
+
+type enumFrom{{ .TitlePrefix }}Checker struct {
+	{{ .TitlePrefix }}Checker
+}
+
+func (ch enumFrom{{ .TitlePrefix }}Checker) Check(_ int, item {{ .TypeName }}) (bool, error) {
+	return ch.{{ .TitlePrefix }}Checker.Check(item)
+}
+
+// EnumFrom{{ .TitlePrefix }}Checker adapts checker type of {{ .TitlePrefix }}Checker
+// to the interface {{ .TitlePrefix }}EnumChecker.
+// If checker is nil it is return based on Always{{ .TitlePrefix }}CheckFalse enum checker.
+func EnumFrom{{ .TitlePrefix }}Checker(checker {{ .TitlePrefix }}Checker) {{ .TitlePrefix }}EnumChecker {
+	if checker == nil {
+		checker = Always{{ .TitlePrefix }}CheckFalse
+	}
+	return &enumFrom{{ .TitlePrefix }}Checker{checker}
+}
+
+var (
+	// Always{{ .TitlePrefix }}EnumCheckTrue always returns true and empty error.
+	Always{{ .TitlePrefix }}EnumCheckTrue = EnumFrom{{ .TitlePrefix }}Checker(
+		Always{{ .TitlePrefix }}CheckTrue)
+	// Always{{ .TitlePrefix }}EnumCheckFalse always returns false and empty error.
+	Always{{ .TitlePrefix }}EnumCheckFalse = EnumFrom{{ .TitlePrefix }}Checker(
+		Always{{ .TitlePrefix }}CheckFalse)
+)
+
+// EnumNot{{ .TitlePrefix }} do an inversion for checker result.
+// It is returns Always{{ .TitlePrefix }}EnumCheckTrue if checker is nil.
+func EnumNot{{ .TitlePrefix }}(checker {{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}EnumChecker {
+	if checker == nil {
+		return Always{{ .TitlePrefix }}EnumCheckTrue
+	}
+	return {{ .TitlePrefix }}EnumCheck(func(n int, item {{ .TypeName }}) (bool, error) {
+		yes, err := checker.Check(n, item)
+		if err != nil {
+			// No error wrapping since an error context is missing.
+			return false, err
+		}
+
+		return !yes, nil
+	})
+}
+
+type enumAnd{{ .TitlePrefix }} struct {
+	lhs, rhs {{ .TitlePrefix }}EnumChecker
+}
+
+func (a enumAnd{{ .TitlePrefix }}) Check(n int, item {{ .TypeName }}) (bool, error) {
+	isLHSPassed, err := a.lhs.Check(n, item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "lhs check")
+	}
+	if !isLHSPassed {
+		return false, nil
+	}
+
+	isRHSPassed, err := a.rhs.Check(n, item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "rhs check")
+	}
+	return isRHSPassed, nil
+}
+
+// EnumAll{{ .TitlePrefix }} combines all the given checkers to one
+// checking if all checkers return true.
+// It returns true if the list of checkers is empty.
+func EnumAll{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}EnumChecker {
+	var all = Always{{ .TitlePrefix }}EnumCheckTrue
+	for i := len(checkers) - 1; i >= 0; i-- {
+		if checkers[i] == nil {
+			continue
+		}
+		all = enumAnd{{ .TitlePrefix }}{checkers[i], all}
+	}
+	return all
+}
+
+type enumOr{{ .TitlePrefix }} struct {
+	lhs, rhs {{ .TitlePrefix }}EnumChecker
+}
+
+func (o enumOr{{ .TitlePrefix }}) Check(n int, item {{ .TypeName }}) (bool, error) {
+	isLHSPassed, err := o.lhs.Check(n, item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "lhs check")
+	}
+	if isLHSPassed {
+		return true, nil
+	}
+
+	isRHSPassed, err := o.rhs.Check(n, item)
+	if err != nil {
+		return false, wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err, "rhs check")
+	}
+	return isRHSPassed, nil
+}
+
+// EnumAny{{ .TitlePrefix }} combines all the given checkers to one.
+// checking if any checker return true.
+// It returns false if the list of checkers is empty.
+func EnumAny{{ .TitlePrefix }}(checkers ...{{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}EnumChecker {
+	var any = Always{{ .TitlePrefix }}EnumCheckFalse
+	for i := len(checkers) - 1; i >= 0; i-- {
+		if checkers[i] == nil {
+			continue
+		}
+		any = enumOr{{ .TitlePrefix }}{checkers[i], any}
+	}
+	return any
+}
+
+// EnumFiltering{{ .TitlePrefix }}Iterator does iteration with
+// filtering by previously set checker.
+type EnumFiltering{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	filter {{ .TitlePrefix }}EnumChecker
+	count  int
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *EnumFiltering{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		isFilterPassed, err := it.filter.Check(it.count, next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "enum filtering iterator: check")
+			}
+			it.err = err
+			return false
+		}
+		it.count++
+
+		if !isFilterPassed {
+			continue
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}EnumFiltering sets filter while iterating over items and their serial numbers.
+// If filters is empty, so all items will return.
+func {{ .TitlePrefix }}EnumFiltering(items {{ .TitlePrefix }}Iterator, filters ...{{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &EnumFiltering{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, EnumAll{{ .TitlePrefix }}(filters...), 0}
+}
+
+// EnumDoingUntil{{ .TitlePrefix }}Iterator does iteration
+// until previously set checker is passed.
+type EnumDoingUntil{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	until {{ .TitlePrefix }}EnumChecker
+	count int
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *EnumDoingUntil{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	for it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		isUntilPassed, err := it.until.Check(it.count, next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "doing until iterator: until")
+			}
+			it.err = err
+			return false
+		}
+		it.count++
+
+		if isUntilPassed {
+			it.err = EndOf{{ .TitlePrefix }}Iterator
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}EnumDoingUntil sets until checker while iterating over items.
+// If untilList is empty, so all items returned as is.
+func {{ .TitlePrefix }}EnumDoingUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}EnumChecker) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	var until {{ .TitlePrefix }}EnumChecker
+	if len(untilList) > 0 {
+		until = EnumAll{{ .TitlePrefix }}(untilList...)
+	} else {
+		until = Always{{ .TitlePrefix }}EnumCheckFalse
+	}
+	return &EnumDoingUntil{{ .TitlePrefix }}Iterator{prepared{{ .TitlePrefix }}Item{base: items}, until, 0}
+}
+
+// {{ .TitlePrefix }}EnumSkipUntil sets until conditions to skip few items.
+func {{ .TitlePrefix }}EnumSkipUntil(items {{ .TitlePrefix }}Iterator, untilList ...{{ .TitlePrefix }}EnumChecker) error {
+	// no error wrapping since no additional context for the error; just return it.
+	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}EnumDoingUntil(items, untilList...))
+}
+
+// {{ .TitlePrefix }}GettingBatch returns the next batch from items.
+func {{ .TitlePrefix }}GettingBatch(items {{ .TitlePrefix }}Iterator, batchSize int) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	if batchSize == 0 {
+		return items
+	}
+
+	return {{ .TitlePrefix }}EnumDoingUntil(items, {{ .TitlePrefix }}EnumCheck(func(n int, item {{ .TypeName }}) (bool, error) {
+		return n == batchSize-1, nil
+	}))
+}
+
+
+
+// {{ .TitlePrefix }}Converter is an object converting an item type of {{ .TypeName }}.
+type {{ .TitlePrefix }}Converter interface {
+	// Convert should convert an item type of {{ .TypeName }} into another item of {{ .TypeName }}.
+	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+	Convert({{ .TypeName }}) ({{ .TypeName }}, error)
+}
+
+// {{ .TitlePrefix }}Convert is a shortcut implementation
+// of {{ .TitlePrefix }}Converter based on a function.
+type {{ .TitlePrefix }}Convert func({{ .TypeName }}) ({{ .TypeName }}, error)
+
+// Convert converts an item type of {{ .TypeName }} into another item of {{ .TypeName }}.
+// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+func (c {{ .TitlePrefix }}Convert) Convert(item {{ .TypeName }}) ({{ .TypeName }}, error) { return c(item) }
+
+// No{{ .TitlePrefix }}Convert does nothing with item, just returns it as is.
+var No{{ .TitlePrefix }}Convert {{ .TitlePrefix }}Converter = {{ .TitlePrefix }}Convert(
+	func(item {{ .TypeName }}) ({{ .TypeName }}, error) { return item, nil })
+
+type double{{ .TitlePrefix }}Converter struct {
+	lhs, rhs {{ .TitlePrefix }}Converter
+}
+
+func (c double{{ .TitlePrefix }}Converter) Convert(item {{ .TypeName }}) ({{ .TypeName }}, error) {
+	item, err := c.lhs.Convert(item)
+	if err != nil {
+		return {{ .ZeroTypeValue }}, errors.Wrap(err, "convert lhs")
+	}
+	item, err = c.rhs.Convert(item)
+	if err != nil {
+		return {{ .ZeroTypeValue }}, errors.Wrap(err, "convert rhs")
+	}
+	return item, nil
+}
+
+// {{ .TitlePrefix }}ConverterSeries combines all the given converters to sequenced one
+// It returns no converter if the list of converters is empty.
+func {{ .TitlePrefix }}ConverterSeries(converters ...{{ .TitlePrefix }}Converter) {{ .TitlePrefix }}Converter {
+	var series = No{{ .TitlePrefix }}Convert
+	for i := len(converters) - 1; i >= 0; i-- {
+		if converters[i] == nil {
+			continue
+		}
+		series = double{{ .TitlePrefix }}Converter{lhs: converters[i], rhs: series}
+	}
+
+	return series
+}
+
+// Converting{{ .TitlePrefix }}Iterator does iteration with
+// converting by previously set converter.
+type Converting{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	converter {{ .TitlePrefix }}Converter
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *Converting{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	if it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		next, err := it.converter.Convert(next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "converting iterator: check")
+			}
+			it.err = err
+			return false
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}Converting sets converter while iterating over items.
+// If converters is empty, so all items will not be affected.
+func {{ .TitlePrefix }}Converting(items {{ .TitlePrefix }}Iterator, converters ...{{ .TitlePrefix }}Converter) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &Converting{{ .TitlePrefix }}Iterator{
+		prepared{{ .TitlePrefix }}Item{base: items}, {{ .TitlePrefix }}ConverterSeries(converters...)}
+}
+
+// {{ .TitlePrefix }}EnumConverter is an object converting an item type of {{ .TypeName }} and its ordering number.
+type {{ .TitlePrefix }}EnumConverter interface {
+	// Convert should convert an item type of {{ .TypeName }} into another item of {{ .TypeName }}.
+	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+	Convert(n int, val {{ .TypeName }}) ({{ .TypeName }}, error)
+}
+
+// {{ .TitlePrefix }}EnumConvert is a shortcut implementation
+// of {{ .TitlePrefix }}EnumConverter based on a function.
+type {{ .TitlePrefix }}EnumConvert func(int, {{ .TypeName }}) ({{ .TypeName }}, error)
+
+// Convert converts an item type of {{ .TypeName }} into another item of {{ .TypeName }}.
+// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+func (c {{ .TitlePrefix }}EnumConvert) Convert(n int, item {{ .TypeName }}) ({{ .TypeName }}, error) { return c(n, item) }
+
+// No{{ .TitlePrefix }}EnumConvert does nothing with item, just returns it as is.
+var No{{ .TitlePrefix }}EnumConvert {{ .TitlePrefix }}EnumConverter = {{ .TitlePrefix }}EnumConvert(
+	func(_ int, item {{ .TypeName }}) ({{ .TypeName }}, error) { return item, nil })
+
+type enumFrom{{ .TitlePrefix }}Converter struct {
+	{{ .TitlePrefix }}Converter
+}
+
+func (ch enumFrom{{ .TitlePrefix }}Converter) Convert(_ int, item {{ .TypeName }}) ({{ .TypeName }}, error) {
+	return ch.{{ .TitlePrefix }}Converter.Convert(item)
+}
+
+// EnumFrom{{ .TitlePrefix }}Converter adapts checker type of {{ .TitlePrefix }}Converter
+// to the interface {{ .TitlePrefix }}EnumConverter.
+// If converter is nil it is return based on No{{ .TitlePrefix }}Convert enum checker.
+func EnumFrom{{ .TitlePrefix }}Converter(converter {{ .TitlePrefix }}Converter) {{ .TitlePrefix }}EnumConverter {
+	if converter == nil {
+		converter = No{{ .TitlePrefix }}Convert
+	}
+	return &enumFrom{{ .TitlePrefix }}Converter{converter}
+}
+
+type double{{ .TitlePrefix }}EnumConverter struct {
+	lhs, rhs {{ .TitlePrefix }}EnumConverter
+}
+
+func (c double{{ .TitlePrefix }}EnumConverter) Convert(n int, item {{ .TypeName }}) ({{ .TypeName }}, error) {
+	item, err := c.lhs.Convert(n, item)
+	if err != nil {
+		return {{ .ZeroTypeValue }}, errors.Wrap(err, "convert lhs")
+	}
+	item, err = c.rhs.Convert(n, item)
+	if err != nil {
+		return {{ .ZeroTypeValue }}, errors.Wrap(err, "convert rhs")
+	}
+	return item, nil
+}
+
+// Enum{{ .TitlePrefix }}ConverterSeries combines all the given converters to sequenced one
+// It returns no converter if the list of converters is empty.
+func Enum{{ .TitlePrefix }}ConverterSeries(converters ...{{ .TitlePrefix }}EnumConverter) {{ .TitlePrefix }}EnumConverter {
+	var series = No{{ .TitlePrefix }}EnumConvert
+	for i := len(converters) - 1; i >= 0; i-- {
+		if converters[i] == nil {
+			continue
+		}
+		series = double{{ .TitlePrefix }}EnumConverter{lhs: converters[i], rhs: series}
+	}
+
+	return series
+}
+
+// EnumConverting{{ .TitlePrefix }}Iterator does iteration with
+// converting by previously set converter.
+type EnumConverting{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	converter {{ .TitlePrefix }}EnumConverter
+	count     int
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *EnumConverting{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	if it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		next, err := it.converter.Convert(it.count, next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "converting iterator: check")
+			}
+			it.err = err
+			return false
+		}
+		it.count++
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}EnumConverting sets converter while iterating over items and their ordering numbers.
+// If converters is empty, so all items will not be affected.
+func {{ .TitlePrefix }}EnumConverting(items {{ .TitlePrefix }}Iterator, converters ...{{ .TitlePrefix }}EnumConverter) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &EnumConverting{{ .TitlePrefix }}Iterator{
+		prepared{{ .TitlePrefix }}Item{base: items}, Enum{{ .TitlePrefix }}ConverterSeries(converters...), 0}
+}
+
+
+
+// {{ .TitlePrefix }}Handler is an object handling an item type of {{ .TypeName }}.
+type {{ .TitlePrefix }}Handler interface {
+	// Handle should do something with item of {{ .TypeName }}.
+	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+	Handle({{ .TypeName }}) error
+}
+
+// {{ .TitlePrefix }}Handle is a shortcut implementation
+// of {{ .TitlePrefix }}Handler based on a function.
+type {{ .TitlePrefix }}Handle func({{ .TypeName }}) error
+
+// Handle does something with item of {{ .TypeName }}.
+// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+func (h {{ .TitlePrefix }}Handle) Handle(item {{ .TypeName }}) error { return h(item) }
+
+// {{ .TitlePrefix }}DoNothing does nothing.
+var {{ .TitlePrefix }}DoNothing {{ .TitlePrefix }}Handler = {{ .TitlePrefix }}Handle(func(_ {{ .TypeName }}) error { return nil })
+
+type double{{ .TitlePrefix }}Handler struct {
+	lhs, rhs {{ .TitlePrefix }}Handler
+}
+
+func (h double{{ .TitlePrefix }}Handler) Handle(item {{ .TypeName }}) error {
+	err := h.lhs.Handle(item)
+	if err != nil {
+		return errors.Wrap(err, "handle lhs")
+	}
+	err = h.rhs.Handle(item)
+	if err != nil {
+		return errors.Wrap(err, "handle rhs")
+	}
+	return nil
+}
+
+// {{ .TitlePrefix }}HandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
+func {{ .TitlePrefix }}HandlerSeries(handlers ...{{ .TitlePrefix }}Handler) {{ .TitlePrefix }}Handler {
+	var series = {{ .TitlePrefix }}DoNothing
+	for i := len(handlers) - 1; i >= 0; i-- {
+		if handlers[i] == nil {
+			continue
+		}
+		series = double{{ .TitlePrefix }}Handler{lhs: handlers[i], rhs: series}
+	}
+	return series
+}
+
+// Handling{{ .TitlePrefix }}Iterator does iteration with
+// handling by previously set handler.
+type Handling{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	handler {{ .TitlePrefix }}Handler
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *Handling{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	if it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		err := it.handler.Handle(next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "handling iterator: check")
+			}
+			it.err = err
+			return false
+		}
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}Handling sets handler while iterating over items.
+// If handlers is empty, so it will do nothing.
+func {{ .TitlePrefix }}Handling(items {{ .TitlePrefix }}Iterator, handlers ...{{ .TitlePrefix }}Handler) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &Handling{{ .TitlePrefix }}Iterator{
+		prepared{{ .TitlePrefix }}Item{base: items}, {{ .TitlePrefix }}HandlerSeries(handlers...)}
+}
+
+// {{ .TitlePrefix }}Range iterates over items and use handlers to each one.
+func {{ .TitlePrefix }}Range(items {{ .TitlePrefix }}Iterator, handlers ...{{ .TitlePrefix }}Handler) error {
+	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}Handling(items, handlers...))
+}
+
+// {{ .TitlePrefix }}RangeIterator is an iterator over items.
+type {{ .TitlePrefix }}RangeIterator interface {
+	// Range should iterate over items.
+	Range(...{{ .TitlePrefix }}Handler) error
+}
+
+type s{{ .TitlePrefix }}RangeIterator struct {
+	iter {{ .TitlePrefix }}Iterator
+}
+
+// To{{ .TitlePrefix }}RangeIterator constructs an instance implementing {{ .TitlePrefix }}RangeIterator
+// based on {{ .TitlePrefix }}Iterator.
+func To{{ .TitlePrefix }}RangeIterator(iter {{ .TitlePrefix }}Iterator) {{ .TitlePrefix }}RangeIterator {
+	if iter == nil {
+		iter = Empty{{ .TitlePrefix }}Iterator
+	}
+	return s{{ .TitlePrefix }}RangeIterator{iter: iter}
+}
+
+// Make{{ .TitlePrefix }}RangeIterator constructs an instance implementing {{ .TitlePrefix }}RangeIterator
+// based on {{ .TitlePrefix }}IterMaker.
+func Make{{ .TitlePrefix }}RangeIterator(maker {{ .TitlePrefix }}IterMaker) {{ .TitlePrefix }}RangeIterator {
+	if maker == nil {
+		maker = MakeNo{{ .TitlePrefix }}Iter
+	}
+	return To{{ .TitlePrefix }}RangeIterator(maker.MakeIter())
+}
+
+// Range iterates over items.
+func (r s{{ .TitlePrefix }}RangeIterator) Range(handlers ...{{ .TitlePrefix }}Handler) error {
+	return {{ .TitlePrefix }}Range(r.iter, handlers...)
+}
+
+// {{ .TitlePrefix }}EnumHandler is an object handling an item type of {{ .TypeName }} and its ordered number.
+type {{ .TitlePrefix }}EnumHandler interface {
+	// Handle should do something with item of {{ .TypeName }} and its ordered number.
+	// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+	Handle(int, {{ .TypeName }}) error
+}
+
+// {{ .TitlePrefix }}EnumHandle is a shortcut implementation
+// of {{ .TitlePrefix }}EnumHandler based on a function.
+type {{ .TitlePrefix }}EnumHandle func(int, {{ .TypeName }}) error
+
+// Handle does something with item of {{ .TypeName }} and its ordered number.
+// It is suggested to return EndOf{{ .TitlePrefix }}Iterator to stop iteration.
+func (h {{ .TitlePrefix }}EnumHandle) Handle(n int, item {{ .TypeName }}) error { return h(n, item) }
+
+// {{ .TitlePrefix }}DoEnumNothing does nothing.
+var {{ .TitlePrefix }}DoEnumNothing = {{ .TitlePrefix }}EnumHandle(func(_ int, _ {{ .TypeName }}) error { return nil })
+
+type double{{ .TitlePrefix }}EnumHandler struct {
+	lhs, rhs {{ .TitlePrefix }}EnumHandler
+}
+
+func (h double{{ .TitlePrefix }}EnumHandler) Handle(n int, item {{ .TypeName }}) error {
+	err := h.lhs.Handle(n, item)
+	if err != nil {
+		return errors.Wrap(err, "handle lhs")
+	}
+	err = h.rhs.Handle(n, item)
+	if err != nil {
+		return errors.Wrap(err, "handle rhs")
+	}
+	return nil
+}
+
+// {{ .TitlePrefix }}EnumHandlerSeries combines all the given handlers to sequenced one
+// It returns do nothing handler if the list of handlers is empty.
+func {{ .TitlePrefix }}EnumHandlerSeries(handlers ...{{ .TitlePrefix }}EnumHandler) {{ .TitlePrefix }}EnumHandler {
+	var series {{ .TitlePrefix }}EnumHandler = {{ .TitlePrefix }}DoEnumNothing
+	for i := len(handlers) - 1; i >= 0; i-- {
+		if handlers[i] == nil {
+			continue
+		}
+		series = double{{ .TitlePrefix }}EnumHandler{lhs: handlers[i], rhs: series}
+	}
+	return series
+}
+
+// EnumHandling{{ .TitlePrefix }}Iterator does iteration with
+// handling by previously set handler.
+type EnumHandling{{ .TitlePrefix }}Iterator struct {
+	prepared{{ .TitlePrefix }}Item
+	handler {{ .TitlePrefix }}EnumHandler
+	count   int
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it *EnumHandling{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.hasNext {
+		return true
+	}
+	if it.prepared{{ .TitlePrefix }}Item.HasNext() {
+		next := it.base.Next()
+		err := it.handler.Handle(it.count, next)
+		if err != nil {
+			if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+				err = errors.Wrap(err, "enum handling iterator: check")
+			}
+			it.err = err
+			return false
+		}
+		it.count++
+
+		it.hasNext = true
+		it.next = next
+		return true
+	}
+
+	return false
+}
+
+// {{ .TitlePrefix }}EnumHandling sets handler while iterating over items with their serial number.
+// If handlers is empty, so it will do nothing.
+func {{ .TitlePrefix }}EnumHandling(items {{ .TitlePrefix }}Iterator, handlers ...{{ .TitlePrefix }}EnumHandler) {{ .TitlePrefix }}Iterator {
+	if items == nil {
+		return Empty{{ .TitlePrefix }}Iterator
+	}
+	return &EnumHandling{{ .TitlePrefix }}Iterator{
+		prepared{{ .TitlePrefix }}Item{base: items}, {{ .TitlePrefix }}EnumHandlerSeries(handlers...), 0}
+}
+
+// {{ .TitlePrefix }}Enum iterates over items and their ordering numbers and use handlers to each one.
+func {{ .TitlePrefix }}Enum(items {{ .TitlePrefix }}Iterator, handlers ...{{ .TitlePrefix }}EnumHandler) error {
+	return {{ .TitlePrefix }}Discard({{ .TitlePrefix }}EnumHandling(items, handlers...))
+}
+
+// {{ .TitlePrefix }}EnumIterator is an iterator over items and their ordering numbers.
+type {{ .TitlePrefix }}EnumIterator interface {
+	// Enum should iterate over items and their ordering numbers.
+	Enum(...{{ .TitlePrefix }}EnumHandler) error
+}
+
+type s{{ .TitlePrefix }}EnumIterator struct {
+	iter {{ .TitlePrefix }}Iterator
+}
+
+// To{{ .TitlePrefix }}EnumIterator constructs an instance implementing {{ .TitlePrefix }}EnumIterator
+// based on {{ .TitlePrefix }}Iterator.
+func To{{ .TitlePrefix }}EnumIterator(iter {{ .TitlePrefix }}Iterator) {{ .TitlePrefix }}EnumIterator {
+	if iter == nil {
+		iter = Empty{{ .TitlePrefix }}Iterator
+	}
+	return s{{ .TitlePrefix }}EnumIterator{iter: iter}
+}
+
+// Make{{ .TitlePrefix }}EnumIterator constructs an instance implementing {{ .TitlePrefix }}EnumIterator
+// based on {{ .TitlePrefix }}IterMaker.
+func Make{{ .TitlePrefix }}EnumIterator(maker {{ .TitlePrefix }}IterMaker) {{ .TitlePrefix }}EnumIterator {
+	if maker == nil {
+		maker = MakeNo{{ .TitlePrefix }}Iter
+	}
+	return To{{ .TitlePrefix }}EnumIterator(maker.MakeIter())
+}
+
+// Enum iterates over items and their ordering numbers.
+func (r s{{ .TitlePrefix }}EnumIterator) Enum(handlers ...{{ .TitlePrefix }}EnumHandler) error {
+	return {{ .TitlePrefix }}Enum(r.iter, handlers...)
+}
+
+// Range iterates over items.
+func (r s{{ .TitlePrefix }}EnumIterator) Range(handlers ...{{ .TitlePrefix }}Handler) error {
+	return {{ .TitlePrefix }}Range(r.iter, handlers...)
+}
+
+
+
+type double{{ .TitlePrefix }}Iterator struct {
+	lhs, rhs {{ .TitlePrefix }}Iterator
+	inRHS    bool
+}
+
+func (it *double{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if !it.inRHS {
+		if it.lhs.HasNext() {
+			return true
+		}
+		it.inRHS = true
+	}
+	return it.rhs.HasNext()
+}
+
+func (it *double{{ .TitlePrefix }}Iterator) Next() {{ .TypeName }} {
+	if !it.inRHS {
+		return it.lhs.Next()
+	}
+	return it.rhs.Next()
+}
+
+func (it *double{{ .TitlePrefix }}Iterator) Err() error {
+	if !it.inRHS {
+		return it.lhs.Err()
+	}
+	return it.rhs.Err()
+}
+
+// Super{{ .TitlePrefix }}Iterator combines all iterators to one.
+func Super{{ .TitlePrefix }}Iterator(itemList ...{{ .TitlePrefix }}Iterator) {{ .TitlePrefix }}Iterator {
+	var super = Empty{{ .TitlePrefix }}Iterator
+	for i := len(itemList) - 1; i >= 0; i-- {
+		if itemList[i] == nil {
+			continue
+		}
+		super = &double{{ .TitlePrefix }}Iterator{lhs: itemList[i], rhs: super}
+	}
+	return super
+}
+
+// {{ .TitlePrefix }}Comparer is a strategy to compare two types.
+type {{ .TitlePrefix }}Comparer interface {
+	// IsLess should be true if lhs is less than rhs.
+	IsLess(lhs, rhs {{ .TypeName }}) bool
+}
+
+// {{ .TitlePrefix }}Compare is a shortcut implementation
+// of {{ .TitlePrefix }}Comparer based on a function.
+type {{ .TitlePrefix }}Compare func(lhs, rhs {{ .TypeName }}) bool
+
+// IsLess is true if lhs is less than rhs.
+func (c {{ .TitlePrefix }}Compare) IsLess(lhs, rhs {{ .TypeName }}) bool { return c(lhs, rhs) }
+
+// {{ .TitlePrefix }}AlwaysLess is an implementation of {{ .TitlePrefix }}Comparer returning always true.
+var {{ .TitlePrefix }}AlwaysLess {{ .TitlePrefix }}Comparer = {{ .TitlePrefix }}Compare(func(_, _ {{ .TypeName }}) bool { return true })
+
+type priority{{ .TitlePrefix }}Iterator struct {
+	lhs, rhs prepared{{ .TitlePrefix }}Item
+	comparer {{ .TitlePrefix }}Comparer
+}
+
+func (it *priority{{ .TitlePrefix }}Iterator) HasNext() bool {
+	if it.lhs.hasNext && it.rhs.hasNext {
+		return true
+	}
+	if !it.lhs.hasNext && it.lhs.HasNext() {
+		next := it.lhs.base.Next()
+		it.lhs.hasNext = true
+		it.lhs.next = next
+	}
+	if !it.rhs.hasNext && it.rhs.HasNext() {
+		next := it.rhs.base.Next()
+		it.rhs.hasNext = true
+		it.rhs.next = next
+	}
+
+	return it.lhs.hasNext || it.rhs.hasNext
+}
+
+func (it *priority{{ .TitlePrefix }}Iterator) Next() {{ .TypeName }} {
+	if !it.lhs.hasNext && !it.rhs.hasNext {
+		panicIf{{ .TitlePrefix }}IteratorError(
+			errors.New("no next"), "priority: next")
+	}
+
+	if !it.lhs.hasNext {
+		// it.rhs.hasNext == true
+		return it.rhs.Next()
+	}
+	if !it.rhs.hasNext {
+		// it.lhs.hasNext == true
+		return it.lhs.Next()
+	}
+
+	// both have next
+	lhsNext := it.lhs.Next()
+	rhsNext := it.rhs.Next()
+	if it.comparer.IsLess(lhsNext, rhsNext) {
+		// remember rhsNext
+		it.rhs.hasNext = true
+		it.rhs.next = rhsNext
+		return lhsNext
+	}
+
+	// rhsNext is less than or equal to lhsNext.
+	// remember lhsNext
+	it.lhs.hasNext = true
+	it.lhs.next = lhsNext
+	return rhsNext
+}
+
+func (it priority{{ .TitlePrefix }}Iterator) Err() error {
+	if err := it.lhs.Err(); err != nil {
+		return err
+	}
+	return it.rhs.Err()
+}
+
+// Prior{{ .TitlePrefix }}Iterator compare one by one items fetched from
+// all iterators and choose smallest from them to return as next.
+// If comparer is nil so more left iterator is considered had smallest item.
+// It is recommended to use the iterator to order already ordered iterators.
+func Prior{{ .TitlePrefix }}Iterator(comparer {{ .TitlePrefix }}Comparer, itemList ...{{ .TitlePrefix }}Iterator) {{ .TitlePrefix }}Iterator {
+	if comparer == nil {
+		comparer = {{ .TitlePrefix }}AlwaysLess
+	}
+
+	var prior = Empty{{ .TitlePrefix }}Iterator
+	for i := len(itemList) - 1; i >= 0; i-- {
+		if itemList[i] == nil {
+			continue
+		}
+		prior = &priority{{ .TitlePrefix }}Iterator{
+			lhs:      prepared{{ .TitlePrefix }}Item{base: itemList[i]},
+			rhs:      prepared{{ .TitlePrefix }}Item{base: prior},
+			comparer: comparer,
+		}
+	}
+
+	return prior
+}
+
+// {{ .TitlePrefix }}SliceIterator is an iterator based on a slice of {{ .TypeName }}.
+type {{ .TitlePrefix }}SliceIterator struct {
+	slice []{{ .TypeName }}
+	cur   int
+}
+
+// New{{ .TitlePrefix }}SliceIterator returns a new instance of {{ .TitlePrefix }}SliceIterator.
+// Note: any changes in slice will affect correspond items in the iterator.
+// Use {{ .TitlePrefix }}Unroll(slice).MakeIter() instead of to iterate over copies of item in the items.
+func New{{ .TitlePrefix }}SliceIterator(slice []{{ .TypeName }}) *{{ .TitlePrefix }}SliceIterator {
+	it := &{{ .TitlePrefix }}SliceIterator{slice: slice}
+	return it
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it {{ .TitlePrefix }}SliceIterator) HasNext() bool {
+	return it.cur < len(it.slice)
+}
+
+// Next returns next item in the iterator.
+// It should be invoked after check HasNext.
+func (it *{{ .TitlePrefix }}SliceIterator) Next() {{ .TypeName }} {
+	if it.cur >= len(it.slice) {
+		panic("iterator next: pointer out of range")
+	}
+
+	item := it.slice[it.cur]
+	it.cur++
+	return item
+}
+
+// Err contains first met error while Next.
+func ({{ .TitlePrefix }}SliceIterator) Err() error { return nil }
+
+// {{ .TitlePrefix }}SliceIterator is an iterator based on a slice of {{ .TypeName }}
+// and doing iteration in back direction.
+type Inverting{{ .TitlePrefix }}SliceIterator struct {
+	slice []{{ .TypeName }}
+	cur   int
+}
+
+// NewInverting{{ .TitlePrefix }}SliceIterator returns a new instance of Inverting{{ .TitlePrefix }}SliceIterator.
+// Note: any changes in slice will affect correspond items in the iterator.
+// Use Inverting{{ .TitlePrefix }}Slice({{ .TitlePrefix }}Unroll(slice)).MakeIter() instead of to iterate over copies of item in the items.
+func NewInverting{{ .TitlePrefix }}SliceIterator(slice []{{ .TypeName }}) *Inverting{{ .TitlePrefix }}SliceIterator {
+	it := &Inverting{{ .TitlePrefix }}SliceIterator{slice: slice, cur: len(slice) - 1}
+	return it
+}
+
+// HasNext checks if there is the next item
+// in the iterator. HasNext is idempotent.
+func (it Inverting{{ .TitlePrefix }}SliceIterator) HasNext() bool {
+	return it.cur >= 0
+}
+
+// Next returns next item in the iterator.
+// It should be invoked after check HasNext.
+func (it *Inverting{{ .TitlePrefix }}SliceIterator) Next() {{ .TypeName }} {
+	if it.cur < 0 {
+		panic("iterator next: pointer out of range")
+	}
+
+	item := it.slice[it.cur]
+	it.cur--
+	return item
+}
+
+// Err contains first met error while Next.
+func (Inverting{{ .TitlePrefix }}SliceIterator) Err() error { return nil }
+
+// {{ .TitlePrefix }}Unroll unrolls items to slice of {{ .TypeName }}.
+func {{ .TitlePrefix }}Unroll(items {{ .TitlePrefix }}Iterator) {{ .TitlePrefix }}Slice {
+	var slice {{ .TitlePrefix }}Slice
+	panicIf{{ .TitlePrefix }}IteratorError({{ .TitlePrefix }}Discard({{ .TitlePrefix }}Handling(items, {{ .TitlePrefix }}Handle(func(item {{ .TypeName }}) error {
+		slice = append(slice, item)
+		return nil
+	}))), "unroll: discard")
+
+	return slice
+}
+
+// {{ .TitlePrefix }}Slice is a slice of {{ .TypeName }}.
+type {{ .TitlePrefix }}Slice []{{ .TypeName }}
+
+// MakeIter returns a new instance of {{ .TitlePrefix }}Iterator to iterate over it.
+// It returns Empty{{ .TitlePrefix }}Iterator if the error is not nil.
+func (s {{ .TitlePrefix }}Slice) MakeIter() {{ .TitlePrefix }}Iterator {
+	return New{{ .TitlePrefix }}SliceIterator(s)
+}
+
+// {{ .TitlePrefix }}Slice is a slice of {{ .TypeName }} which can make inverting iterator.
+type Inverting{{ .TitlePrefix }}Slice []{{ .TypeName }}
+
+// MakeIter returns a new instance of {{ .TitlePrefix }}Iterator to iterate over it.
+// It returns Empty{{ .TitlePrefix }}Iterator if the error is not nil.
+func (s Inverting{{ .TitlePrefix }}Slice) MakeIter() {{ .TitlePrefix }}Iterator {
+	return NewInverting{{ .TitlePrefix }}SliceIterator(s)
+}
+
+// {{ .TitlePrefix }}Invert unrolls items and make inverting iterator based on them.
+func {{ .TitlePrefix }}Invert(items {{ .TitlePrefix }}Iterator) {{ .TitlePrefix }}Iterator {
+	return Inverting{{ .TitlePrefix }}Slice({{ .TitlePrefix }}Unroll(items)).MakeIter()
+}
+
+
+
+// EndOf{{ .TitlePrefix }}Iterator is an error to stop iterating over an iterator.
+// It is used in some method of the package.
+var EndOf{{ .TitlePrefix }}Iterator = errors.New("end of {{ .TypeName }} iterator")
+
+func isEndOf{{ .TitlePrefix }}Iterator(err error) bool {
+	return errors.Is(err, EndOf{{ .TitlePrefix }}Iterator)
+}
+
+func wrapIfNotEndOf{{ .TitlePrefix }}Iterator(err error, msg string) error {
+	if err == nil {
+		return nil
+	}
+	if !isEndOf{{ .TitlePrefix }}Iterator(err) {
+		err = errors.Wrap(err, msg)
+	}
+	return err
+}
+
+func panicIf{{ .TitlePrefix }}IteratorError(err error, block string) {
+	msg := "something went wrong"
+	if len(block) > 0 {
+		msg = block + ": " + msg
+	}
+	if err != nil {
+		panic(errors.Wrap(err, msg))
+	}
+}
+
+type prepared{{ .TitlePrefix }}Item struct {
+	base    {{ .TitlePrefix }}Iterator
+	hasNext bool
+	next    {{ .TypeName }}
+	err     error
+}
+
+func (it *prepared{{ .TitlePrefix }}Item) HasNext() bool {
+	it.hasNext = it.err == nil && it.base.HasNext()
+	return it.hasNext
+}
+
+func (it *prepared{{ .TitlePrefix }}Item) Next() {{ .TypeName }} {
+	if !it.hasNext {
+		panicIf{{ .TitlePrefix }}IteratorError(
+			errors.New("no next"), "prepared: next")
+	}
+	next := it.next
+	it.hasNext = false
+	it.next = {{ .ZeroTypeValue }}
+	return next
+}
+
+func (it prepared{{ .TitlePrefix }}Item) Err() error {
+	if it.err != nil && !errors.Is(it.err, EndOf{{ .TitlePrefix }}Iterator) {
+		return it.err
+	}
+	return it.base.Err()
 }
